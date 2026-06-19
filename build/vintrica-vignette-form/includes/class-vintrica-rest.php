@@ -115,7 +115,7 @@ class Vintrica_Rest {
 		return new WP_REST_Response(
 			array(
 				'success'      => true,
-				'redirect'     => $result['redirect'],
+				'checkout_url' => $result['checkout_url'],
 				'order_number' => $result['order_number'],
 			),
 			200

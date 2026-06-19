@@ -109,11 +109,12 @@ class Vintrica_Frontend {
 			'vintrica-frontend',
 			'vintricaConfig',
 			array(
-				'storageKey'  => $storage_key,
-				'checkoutUrl' => esc_url_raw( rest_url( 'vintrica/v1/checkout' ) ),
-				'restNonce'   => wp_create_nonce( 'wp_rest' ),
-				'config'      => $this->pricing->get_frontend_config(),
-				'strings'     => $this->get_js_strings(),
+				'storageKey'     => $storage_key,
+				'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+				'checkoutAction' => 'vintrica_create_checkout_session',
+				'debug'          => defined( 'WP_DEBUG' ) && WP_DEBUG,
+				'config'         => $this->pricing->get_frontend_config(),
+				'strings'        => $this->get_js_strings(),
 			)
 		);
 	}
@@ -179,7 +180,7 @@ class Vintrica_Frontend {
 			'labelIco'                  => __( 'IČO', 'vintrica-vignette-form' ),
 			'labelDic'                  => __( 'DIČ', 'vintrica-vignette-form' ),
 			'labelIcDph'                => __( 'IČ DPH', 'vintrica-vignette-form' ),
-			'paymentProcessing'         => __( 'Pripravujeme platbu…', 'vintrica-vignette-form' ),
+			'paymentProcessing'         => __( 'Presmerovávam na platbu...', 'vintrica-vignette-form' ),
 			'paymentFailed'             => __( 'Platbu sa nepodarilo spustiť. Skúste to prosím znova.', 'vintrica-vignette-form' ),
 		);
 	}
@@ -589,7 +590,7 @@ class Vintrica_Frontend {
 							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-edit-vignettes">
 								<?php echo esc_html__( 'Upraviť známky', 'vintrica-vignette-form' ); ?>
 							</button>
-							<button type="button" class="vintrica-submit vintrica-pay-submit">
+							<button type="button" id="vintrica-pay-submit" class="vintrica-submit vintrica-pay-submit">
 								<?php echo esc_html__( 'Zaplatiť', 'vintrica-vignette-form' ); ?>
 							</button>
 						</div>

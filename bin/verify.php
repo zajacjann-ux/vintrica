@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.3.2' );
+		define( 'VINTRICA_VERSION', '1.3.3' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {

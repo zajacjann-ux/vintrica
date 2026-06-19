@@ -53,13 +53,42 @@ class Vintrica_Checkout {
 		$this->pricing  = $pricing;
 		$this->orders   = $orders;
 		$this->stripe   = $stripe;
+
+		add_action( 'wp_ajax_vintrica_create_checkout_session', array( $this, 'ajax_create_checkout_session' ) );
+		add_action( 'wp_ajax_nopriv_vintrica_create_checkout_session', array( $this, 'ajax_create_checkout_session' ) );
+	}
+
+	/**
+	 * AJAX handler for Stripe Checkout Session creation.
+	 *
+	 * @return void
+	 */
+	public function ajax_create_checkout_session() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified in process_submission().
+		$post_data = wp_unslash( $_POST );
+		$result    = $this->process_submission( is_array( $post_data ) ? $post_data : array() );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+				)
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'checkout_url' => $result['checkout_url'],
+				'order_number' => $result['order_number'],
+			)
+		);
 	}
 
 	/**
 	 * Process a full checkout submission after review confirmation.
 	 *
 	 * @param array $post_data Raw POST data.
-	 * @return array{redirect: string, order_number: string}|WP_Error
+	 * @return array{checkout_url: string, order_number: string}|WP_Error
 	 */
 	public function process_submission( array $post_data ) {
 		if ( ! $this->security->verify_form_request_from_post( $post_data ) ) {
@@ -135,7 +164,7 @@ class Vintrica_Checkout {
 		do_action( 'vintrica_order_created', $order, $stripe_session );
 
 		return array(
-			'redirect'     => $stripe_session['checkout_url'],
+			'checkout_url' => $stripe_session['checkout_url'],
 			'order_number' => $order->order_number,
 		);
 	}

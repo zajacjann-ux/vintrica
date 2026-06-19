@@ -93,7 +93,7 @@
 		this.backBuilderButton = form.querySelector('.vintrica-back-builder');
 		this.backBillingButton = form.querySelector('.vintrica-back-billing');
 		this.editVignettesButton = form.querySelector('.vintrica-edit-vignettes');
-		this.payButton = form.querySelector('.vintrica-pay-submit');
+		this.payButton = form.querySelector('#vintrica-pay-submit') || form.querySelector('.vintrica-pay-submit');
 		this.billingError = form.querySelector('.vintrica-billing-error');
 		this.reviewError = form.querySelector('.vintrica-review-error');
 		this.stepBuilder = form.querySelector('.vintrica-step--builder');
@@ -180,22 +180,44 @@
 			self.goToStep(1);
 		});
 
-		this.payButton.addEventListener('click', function () {
-			self.handlePayment();
-		});
+		if (this.payButton) {
+			this.payButton.addEventListener('click', function (event) {
+				event.preventDefault();
+				self.handlePayment(event);
+			});
+		}
 
 		this.form.addEventListener('submit', function (event) {
 			event.preventDefault();
 		});
 	};
 
-	VintricaBuilder.prototype.handlePayment = function () {
+	VintricaBuilder.prototype.debugLog = function () {
+		if (!window.vintricaConfig.debug || typeof console === 'undefined' || !console.log) {
+			return;
+		}
+
+		console.log.apply(console, ['[VINTRICA]'].concat(Array.prototype.slice.call(arguments)));
+	};
+
+	VintricaBuilder.prototype.handlePayment = function (event) {
 		var self = this;
 		var validation;
 		var formData;
 		var originalText;
+		var ajaxUrl;
+		var checkoutAction;
+
+		if (event && typeof event.preventDefault === 'function') {
+			event.preventDefault();
+		}
 
 		if (this.currentStep !== 3) {
+			return;
+		}
+
+		if (!this.payButton) {
+			this.debugLog('payment button not found');
 			return;
 		}
 
@@ -206,14 +228,17 @@
 			return;
 		}
 
-		if (!window.vintricaConfig.checkoutUrl || !window.vintricaConfig.restNonce) {
+		ajaxUrl = window.vintricaConfig.ajaxUrl;
+		checkoutAction = window.vintricaConfig.checkoutAction;
+
+		if (!ajaxUrl || !checkoutAction) {
+			this.debugLog('missing ajax config', { ajaxUrl: ajaxUrl, checkoutAction: checkoutAction });
 			this.showReviewError(strings.paymentFailed);
 			return;
 		}
 
 		this.clearReviewError();
 		this.persistState();
-		this.goToStep(4);
 
 		originalText = this.payButton.textContent;
 		this.payButton.disabled = true;
@@ -221,13 +246,13 @@
 		this.payButton.textContent = strings.paymentProcessing;
 
 		formData = new FormData(this.form);
+		formData.set('action', checkoutAction);
 
-		fetch(window.vintricaConfig.checkoutUrl, {
+		this.debugLog('creating checkout session');
+
+		fetch(ajaxUrl, {
 			method: 'POST',
 			credentials: 'same-origin',
-			headers: {
-				'X-WP-Nonce': window.vintricaConfig.restNonce
-			},
 			body: formData
 		})
 			.then(function (response) {
@@ -236,22 +261,39 @@
 						ok: response.ok,
 						data: data
 					};
+				}).catch(function () {
+					return {
+						ok: false,
+						data: null
+					};
 				});
 			})
 			.then(function (result) {
-				if (!result.ok || !result.data || !result.data.success || !result.data.redirect) {
-					throw new Error(result.data && result.data.message ? result.data.message : strings.paymentFailed);
+				var payload = result.data;
+				var message;
+
+				self.debugLog('checkout response', payload);
+
+				if (!payload || !payload.success) {
+					message = payload && payload.data && payload.data.message
+						? payload.data.message
+						: strings.paymentFailed;
+					throw new Error(message);
+				}
+
+				if (!payload.data || !payload.data.checkout_url) {
+					throw new Error(strings.paymentFailed);
 				}
 
 				self.clearStorage();
-				window.location.href = result.data.redirect;
+				window.location.href = payload.data.checkout_url;
 			})
 			.catch(function (error) {
-				self.goToStep(3);
 				self.payButton.disabled = false;
 				self.payButton.removeAttribute('aria-busy');
 				self.payButton.textContent = originalText;
 				self.showReviewError(error.message || strings.paymentFailed);
+				self.debugLog('checkout failed', error.message || error);
 			});
 	};
 

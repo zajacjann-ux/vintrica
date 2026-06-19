@@ -112,7 +112,7 @@ class Vintrica_Stripe {
 		if ( ! $this->is_configured() ) {
 			return new WP_Error(
 				'vintrica_stripe_not_configured',
-				__( 'Stripe platba nie je nakonfigurovaná. Kontaktujte prevádzkovateľa webu.', 'vintrica-vignette-form' )
+				__( 'Stripe nie je správne nastavený.', 'vintrica-vignette-form' )
 			);
 		}
 
