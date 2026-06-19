@@ -15,7 +15,7 @@ class Vintrica_Orders {
 	/**
 	 * Database version for schema upgrades.
 	 */
-	const DB_VERSION = '1.1.0';
+	const DB_VERSION = '1.2.0';
 
 	/**
 	 * Option key for stored DB version.
@@ -117,12 +117,15 @@ class Vintrica_Orders {
 			currency varchar(8) NOT NULL DEFAULT 'EUR',
 			stripe_session_id varchar(255) DEFAULT NULL,
 			stripe_session_payload longtext DEFAULT NULL,
+			stripe_payment_intent_id varchar(255) DEFAULT NULL,
 			ip_address varchar(45) DEFAULT NULL,
 			created_at datetime NOT NULL,
+			paid_at datetime DEFAULT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY order_number (order_number),
 			KEY status (status),
-			KEY created_at (created_at)
+			KEY created_at (created_at),
+			KEY stripe_session_id (stripe_session_id)
 		) {$charset_collate};";
 
 		dbDelta( $sql );
@@ -221,7 +224,57 @@ class Vintrica_Orders {
 	}
 
 	/**
-	 * Get order by ID.
+	 * Mark an order as paid.
+	 *
+	 * @param int    $order_id          Order ID.
+	 * @param string $payment_intent_id Stripe payment intent ID.
+	 * @return bool|WP_Error
+	 */
+	public function mark_as_paid( $order_id, $payment_intent_id = '' ) {
+		global $wpdb;
+
+		$data = array(
+			'status'  => self::STATUS_PAID,
+			'paid_at' => current_time( 'mysql', true ),
+		);
+		$format = array( '%s', '%s' );
+
+		if ( '' !== $payment_intent_id ) {
+			$data['stripe_payment_intent_id'] = sanitize_text_field( $payment_intent_id );
+			$format[]                         = '%s';
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $wpdb->update(
+			$this->get_table_name(),
+			$data,
+			array( 'id' => (int) $order_id ),
+			$format,
+			array( '%d' )
+		);
+
+		return false !== $updated;
+	}
+
+	/**
+	 * Get order by Stripe session ID.
+	 *
+	 * @param string $session_id Stripe session ID.
+	 * @return object|null
+	 */
+	public function get_order_by_stripe_session_id( $session_id ) {
+		global $wpdb;
+
+		$table_name = $this->get_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table_name} WHERE stripe_session_id = %s",
+				sanitize_text_field( $session_id )
+			)
+		);
+	}
 	 *
 	 * @param int $order_id Order ID.
 	 * @return object|null

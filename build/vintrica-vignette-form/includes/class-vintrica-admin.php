@@ -141,6 +141,7 @@ class Vintrica_Admin {
 			array(
 				'secret_key'      => isset( $_POST['vintrica_stripe_secret_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_secret_key'] ) ) : '',
 				'publishable_key' => isset( $_POST['vintrica_stripe_publishable_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_publishable_key'] ) ) : '',
+				'webhook_secret'  => isset( $_POST['vintrica_stripe_webhook_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_webhook_secret'] ) ) : '',
 				'test_mode'       => ! empty( $_POST['vintrica_stripe_test_mode'] ),
 			)
 		);
@@ -331,6 +332,18 @@ class Vintrica_Admin {
 						<code><?php echo esc_html( $order->stripe_session_id ); ?></code>
 					</p>
 				<?php endif; ?>
+				<?php if ( ! empty( $order->stripe_payment_intent_id ) ) : ?>
+					<p>
+						<strong><?php echo esc_html__( 'Stripe payment intent ID:', 'vintrica-vignette-form' ); ?></strong>
+						<code><?php echo esc_html( $order->stripe_payment_intent_id ); ?></code>
+					</p>
+				<?php endif; ?>
+				<?php if ( ! empty( $order->paid_at ) ) : ?>
+					<p>
+						<strong><?php echo esc_html__( 'Dátum úhrady:', 'vintrica-vignette-form' ); ?></strong>
+						<?php echo esc_html( get_date_from_gmt( $order->paid_at, 'd.m.Y H:i' ) ); ?>
+					</p>
+				<?php endif; ?>
 			</div>
 
 			<h2><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></h2>
@@ -432,16 +445,27 @@ class Vintrica_Admin {
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'Nastavenia Stripe', 'vintrica-vignette-form' ); ?></h1>
 			<p><?php echo esc_html__( 'Zadajte Stripe API kľúče pre presmerovanie zákazníkov na Stripe Checkout po potvrdení objednávky.', 'vintrica-vignette-form' ); ?></p>
+			<p>
+				<strong><?php echo esc_html__( 'VINTRICA webhook URL:', 'vintrica-vignette-form' ); ?></strong><br />
+				<code><?php echo esc_html( $stripe->get_webhook_url() ); ?></code>
+			</p>
 			<form method="post">
 				<?php wp_nonce_field( self::STRIPE_SETTINGS_NONCE, 'vintrica_stripe_settings_nonce' ); ?>
 				<table class="form-table" role="presentation">
 					<tr>
-						<th scope="row"><label for="vintrica-stripe-secret-key"><?php echo esc_html__( 'Secret key', 'vintrica-vignette-form' ); ?></label></th>
+						<th scope="row"><label for="vintrica-stripe-secret-key"><?php echo esc_html__( 'Secret Key', 'vintrica-vignette-form' ); ?></label></th>
 						<td><input type="password" class="regular-text" id="vintrica-stripe-secret-key" name="vintrica_stripe_secret_key" value="<?php echo esc_attr( $stripe->get_secret_key() ); ?>" autocomplete="off" /></td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="vintrica-stripe-publishable-key"><?php echo esc_html__( 'Publishable key', 'vintrica-vignette-form' ); ?></label></th>
+						<th scope="row"><label for="vintrica-stripe-publishable-key"><?php echo esc_html__( 'Publishable Key', 'vintrica-vignette-form' ); ?></label></th>
 						<td><input type="text" class="regular-text" id="vintrica-stripe-publishable-key" name="vintrica_stripe_publishable_key" value="<?php echo esc_attr( $stripe->get_publishable_key() ); ?>" autocomplete="off" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="vintrica-stripe-webhook-secret"><?php echo esc_html__( 'Stripe Webhook Secret', 'vintrica-vignette-form' ); ?></label></th>
+						<td>
+							<input type="password" class="regular-text" id="vintrica-stripe-webhook-secret" name="vintrica_stripe_webhook_secret" value="<?php echo esc_attr( $stripe->get_webhook_secret() ); ?>" autocomplete="off" />
+							<p class="description"><?php echo esc_html__( 'Signing secret z webhooku checkout.session.completed vo vašom Stripe dashboarde.', 'vintrica-vignette-form' ); ?></p>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><?php echo esc_html__( 'Testovací režim', 'vintrica-vignette-form' ); ?></th>

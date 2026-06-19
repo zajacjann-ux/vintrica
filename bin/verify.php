@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.3.0' );
+		define( 'VINTRICA_VERSION', '1.3.1' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -370,6 +370,24 @@ function vintrica_bootstrap_wordpress_stubs() {
 		}
 	}
 
+	if ( ! function_exists( 'rest_url' ) ) {
+		function rest_url( $path = '' ) {
+			return 'https://example.test/wp-json/' . ltrim( (string) $path, '/' );
+		}
+	}
+
+	if ( ! function_exists( 'wp_create_nonce' ) ) {
+		function wp_create_nonce( $action ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+			return 'test-rest-nonce';
+		}
+	}
+
+	if ( ! function_exists( 'esc_url_raw' ) ) {
+		function esc_url_raw( $url ) {
+			return (string) $url;
+		}
+	}
+
 	if ( ! function_exists( 'wp_safe_redirect' ) ) {
 		function wp_safe_redirect( $location ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
 			return false;
@@ -503,6 +521,7 @@ $required_files = array(
 	'includes/class-vintrica-orders.php',
 	'includes/class-vintrica-stripe.php',
 	'includes/class-vintrica-checkout.php',
+	'includes/class-vintrica-rest.php',
 	'includes/class-vintrica-admin.php',
 	'includes/class-vintrica-frontend.php',
 	'includes/class-vintrica-activator.php',
@@ -683,7 +702,7 @@ if ( false !== stripos( $plugin_sources, 'woocommerce' ) || false !== stripos( $
 	vintrica_verify_pass( 'Plugin source has no WooCommerce references.' );
 }
 
-if ( ! class_exists( 'Vintrica_Orders' ) || ! class_exists( 'Vintrica_Checkout' ) || ! class_exists( 'Vintrica_Stripe' ) ) {
+if ( ! class_exists( 'Vintrica_Orders' ) || ! class_exists( 'Vintrica_Checkout' ) || ! class_exists( 'Vintrica_Stripe' ) || ! class_exists( 'Vintrica_Rest' ) ) {
 	vintrica_verify_fail( 'Custom checkout classes are missing.' );
 } else {
 	vintrica_verify_pass( 'Custom checkout classes loaded.' );

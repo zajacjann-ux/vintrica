@@ -3,7 +3,7 @@
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.3.0
+ * Version:           1.3.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            VINTRICA
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.3.0' );
+define( 'VINTRICA_VERSION', '1.3.1' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -72,6 +72,13 @@ final class Vintrica_Vignette_Form {
 	public $checkout;
 
 	/**
+	 * REST handler.
+	 *
+	 * @var Vintrica_Rest
+	 */
+	public $rest;
+
+	/**
 	 * Admin handler.
 	 *
 	 * @var Vintrica_Admin
@@ -120,6 +127,7 @@ final class Vintrica_Vignette_Form {
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-orders.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-stripe.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-checkout.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-rest.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-admin.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-frontend.php';
 	}
@@ -135,6 +143,7 @@ final class Vintrica_Vignette_Form {
 		$this->orders   = new Vintrica_Orders();
 		$this->stripe   = new Vintrica_Stripe();
 		$this->checkout = new Vintrica_Checkout( $this->security, $this->pricing, $this->orders, $this->stripe );
+		$this->rest     = new Vintrica_Rest( $this->checkout, $this->stripe );
 		$this->admin    = new Vintrica_Admin();
 		$this->frontend = new Vintrica_Frontend( $this->security, $this->pricing, $this->checkout );
 	}

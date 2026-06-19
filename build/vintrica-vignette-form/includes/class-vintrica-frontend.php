@@ -62,7 +62,6 @@ class Vintrica_Frontend {
 
 		add_action( 'init', array( $this, 'register_shortcode' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
-		add_action( 'template_redirect', array( $this, 'handle_form_submission' ) );
 	}
 
 	/**
@@ -110,9 +109,11 @@ class Vintrica_Frontend {
 			'vintrica-frontend',
 			'vintricaConfig',
 			array(
-				'storageKey' => $storage_key,
-				'config'     => $this->pricing->get_frontend_config(),
-				'strings'    => $this->get_js_strings(),
+				'storageKey'  => $storage_key,
+				'checkoutUrl' => esc_url_raw( rest_url( 'vintrica/v1/checkout' ) ),
+				'restNonce'   => wp_create_nonce( 'wp_rest' ),
+				'config'      => $this->pricing->get_frontend_config(),
+				'strings'     => $this->get_js_strings(),
 			)
 		);
 	}
@@ -178,33 +179,9 @@ class Vintrica_Frontend {
 			'labelIco'                  => __( 'IČO', 'vintrica-vignette-form' ),
 			'labelDic'                  => __( 'DIČ', 'vintrica-vignette-form' ),
 			'labelIcDph'                => __( 'IČ DPH', 'vintrica-vignette-form' ),
+			'paymentProcessing'         => __( 'Pripravujeme platbu…', 'vintrica-vignette-form' ),
+			'paymentFailed'             => __( 'Platbu sa nepodarilo spustiť. Skúste to prosím znova.', 'vintrica-vignette-form' ),
 		);
-	}
-
-	/**
-	 * Handle checkout form submission on template redirect.
-	 *
-	 * @return void
-	 */
-	public function handle_form_submission() {
-		if ( 'POST' !== sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
-			return;
-		}
-
-		if ( ! isset( $_POST[ self::CHECKOUT_SUBMIT_FIELD ] ) ) {
-			return;
-		}
-
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified in checkout handler.
-		$result = $this->checkout->process_submission( wp_unslash( $_POST ) );
-
-		if ( is_wp_error( $result ) ) {
-			$this->set_notice( 'error', $result->get_error_message() );
-			return;
-		}
-
-		wp_safe_redirect( $result['redirect'] );
-		exit;
 	}
 
 	/**
@@ -612,7 +589,7 @@ class Vintrica_Frontend {
 							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-edit-vignettes">
 								<?php echo esc_html__( 'Upraviť známky', 'vintrica-vignette-form' ); ?>
 							</button>
-							<button type="submit" name="<?php echo esc_attr( self::CHECKOUT_SUBMIT_FIELD ); ?>" value="1" class="vintrica-submit vintrica-pay-submit">
+							<button type="button" class="vintrica-submit vintrica-pay-submit">
 								<?php echo esc_html__( 'Zaplatiť', 'vintrica-vignette-form' ); ?>
 							</button>
 						</div>

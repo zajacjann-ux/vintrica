@@ -53,8 +53,6 @@ class Vintrica_Checkout {
 		$this->pricing  = $pricing;
 		$this->orders   = $orders;
 		$this->stripe   = $stripe;
-
-		add_action( 'template_redirect', array( $this, 'maybe_handle_stripe_return' ), 5 );
 	}
 
 	/**
@@ -129,57 +127,16 @@ class Vintrica_Checkout {
 		);
 
 		/**
-		 * Fires after a VINTRICA order is stored and Stripe session is prepared.
+		 * Fires after a VINTRICA order is stored and Stripe session is created.
 		 *
 		 * @param object $order          Order row.
 		 * @param array  $stripe_session Stripe session result.
 		 */
 		do_action( 'vintrica_order_created', $order, $stripe_session );
 
-		if ( ! empty( $stripe_session['checkout_url'] ) ) {
-			return array(
-				'redirect'     => $stripe_session['checkout_url'],
-				'order_number' => $order->order_number,
-			);
-		}
-
 		return array(
-			'redirect'     => add_query_arg(
-				array(
-					'vintrica_order' => rawurlencode( $order->order_number ),
-				),
-				wp_get_referer() ? wp_get_referer() : home_url( '/' )
-			),
+			'redirect'     => $stripe_session['checkout_url'],
 			'order_number' => $order->order_number,
 		);
-	}
-
-	/**
-	 * Handle customer return from Stripe checkout.
-	 *
-	 * @return void
-	 */
-	public function maybe_handle_stripe_return() {
-		if ( ! isset( $_GET['vintrica_order'] ) ) {
-			return;
-		}
-
-		$order_number = sanitize_text_field( wp_unslash( $_GET['vintrica_order'] ) );
-		$order        = $this->orders->get_order_by_number( $order_number );
-
-		if ( ! $order ) {
-			return;
-		}
-
-		if ( isset( $_GET['vintrica_paid'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['vintrica_paid'] ) ) ) {
-			$this->orders->update_status( (int) $order->id, Vintrica_Orders::STATUS_PAID );
-			return;
-		}
-
-		if ( isset( $_GET['vintrica_cancelled'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['vintrica_cancelled'] ) ) ) {
-			if ( Vintrica_Orders::STATUS_PAID !== $this->orders->normalize_status( $order->status ) ) {
-				$this->orders->update_status( (int) $order->id, Vintrica_Orders::STATUS_CANCELLED );
-			}
-		}
 	}
 }

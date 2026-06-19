@@ -180,29 +180,79 @@
 			self.goToStep(1);
 		});
 
-		this.form.addEventListener('submit', function (event) {
-			var validation;
-
-			if (self.currentStep !== 3) {
-				event.preventDefault();
-				return;
-			}
-
-			validation = self.validateCheckout();
-
-			if (!validation.valid) {
-				event.preventDefault();
-				self.showReviewError(validation.message);
-				return;
-			}
-
-			self.clearReviewError();
-			self.persistState();
-			self.clearStorage();
-			self.goToStep(4);
-			self.payButton.disabled = true;
-			self.payButton.setAttribute('aria-busy', 'true');
+		this.payButton.addEventListener('click', function () {
+			self.handlePayment();
 		});
+
+		this.form.addEventListener('submit', function (event) {
+			event.preventDefault();
+		});
+	};
+
+	VintricaBuilder.prototype.handlePayment = function () {
+		var self = this;
+		var validation;
+		var formData;
+		var originalText;
+
+		if (this.currentStep !== 3) {
+			return;
+		}
+
+		validation = this.validateCheckout();
+
+		if (!validation.valid) {
+			this.showReviewError(validation.message);
+			return;
+		}
+
+		if (!window.vintricaConfig.checkoutUrl || !window.vintricaConfig.restNonce) {
+			this.showReviewError(strings.paymentFailed);
+			return;
+		}
+
+		this.clearReviewError();
+		this.persistState();
+		this.goToStep(4);
+
+		originalText = this.payButton.textContent;
+		this.payButton.disabled = true;
+		this.payButton.setAttribute('aria-busy', 'true');
+		this.payButton.textContent = strings.paymentProcessing;
+
+		formData = new FormData(this.form);
+
+		fetch(window.vintricaConfig.checkoutUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: {
+				'X-WP-Nonce': window.vintricaConfig.restNonce
+			},
+			body: formData
+		})
+			.then(function (response) {
+				return response.json().then(function (data) {
+					return {
+						ok: response.ok,
+						data: data
+					};
+				});
+			})
+			.then(function (result) {
+				if (!result.ok || !result.data || !result.data.success || !result.data.redirect) {
+					throw new Error(result.data && result.data.message ? result.data.message : strings.paymentFailed);
+				}
+
+				self.clearStorage();
+				window.location.href = result.data.redirect;
+			})
+			.catch(function (error) {
+				self.goToStep(3);
+				self.payButton.disabled = false;
+				self.payButton.removeAttribute('aria-busy');
+				self.payButton.textContent = originalText;
+				self.showReviewError(error.message || strings.paymentFailed);
+			});
 	};
 
 	VintricaBuilder.prototype.goToStep = function (step) {
