@@ -99,40 +99,35 @@
 
 .vintrica-control {
 	position: relative;
-	display: flex;
-	align-items: center;
 }
 
 .vintrica-control__icon {
 	position: absolute;
-	left: var(--vintrica-icon-left);
+	left: 14px;
 	top: 50%;
-	z-index: 3;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: var(--vintrica-icon-size);
-	height: var(--vintrica-icon-size);
-	color: var(--vintrica-text-muted);
-	pointer-events: none;
 	transform: translateY(-50%);
+	pointer-events: none;
+	z-index: 2;
+	width: 20px;
+	height: 20px;
+	color: var(--vintrica-text-muted);
 }
 
 .vintrica-control__icon svg {
 	display: block;
-	width: var(--vintrica-icon-size);
-	height: var(--vintrica-icon-size);
-	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
 }
 
-.vintrica-field--has-icon .vintrica-control input,
-.vintrica-field--has-icon .vintrica-control select {
+.vintrica-control select,
+.vintrica-control input {
+	padding-left: 48px !important;
 	width: 100%;
 }
 
 .vintrica-field--has-icon .vintrica-control input {
 	height: var(--vintrica-input-height);
-	padding: 0 0.875rem 0 var(--vintrica-icon-padding-left);
+	padding-right: 0.875rem;
 	border: 1px solid var(--vintrica-border);
 	border-radius: var(--vintrica-radius);
 	font-size: 0.9375rem;
@@ -141,6 +136,18 @@
 	color: var(--vintrica-text);
 	box-shadow: var(--vintrica-shadow-sm);
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vintrica-field--has-icon .vintrica-control select {
+	height: var(--vintrica-input-height);
+	padding-right: 0.875rem;
+	border: 1px solid var(--vintrica-border);
+	border-radius: var(--vintrica-radius);
+	font-size: 0.9375rem;
+	line-height: 1.4;
+	background: var(--vintrica-surface);
+	color: var(--vintrica-text);
+	box-shadow: var(--vintrica-shadow-sm);
 }
 
 .vintrica-field--has-icon .vintrica-control input[type="date"] {
@@ -191,6 +198,10 @@
 	font-size: 0.9375rem;
 }
 
+.vintrica-control .vintrica-choices {
+	width: 100%;
+}
+
 .vintrica-vignette-form-wrapper .vintrica-choices__inner {
 	min-height: var(--vintrica-input-height);
 	height: var(--vintrica-input-height);
@@ -201,8 +212,8 @@
 	box-shadow: var(--vintrica-shadow-sm);
 }
 
-.vintrica-vignette-form-wrapper .vintrica-field--has-icon .vintrica-choices__inner {
-	padding-left: var(--vintrica-icon-padding-left);
+.vintrica-control .vintrica-choices__inner {
+	padding-left: 48px !important;
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices.is-focused .vintrica-choices__inner,
@@ -224,9 +235,10 @@
 	color: var(--vintrica-text);
 }
 
-.vintrica-vignette-form-wrapper .vintrica-field--has-icon .vintrica-choices__input {
-	padding-left: 0;
+.vintrica-vignette-form-wrapper .vintrica-control .vintrica-choices__input {
+	padding-left: 0 !important;
 	margin-left: 0;
+	min-width: 0;
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices[data-type*="select-one"]::after {
@@ -768,18 +780,18 @@
 	align-items: center;
 	gap: 0.875rem;
 	padding: 1rem 1.125rem;
-	background: var(--vintrica-card-accent, #4f46e5);
-	color: #fff;
+	background: #111827;
+	color: #ffffff;
 }
 
 .vintrica-review-vignette-card__header-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
+	display: grid;
+	place-items: center;
 	width: 2.5rem;
 	height: 2.5rem;
 	border-radius: 10px;
-	background: rgba(255, 255, 255, 0.16);
+	background: rgba(255, 255, 255, 0.1);
+	color: #ffffff;
 }
 
 .vintrica-review-vignette-card__header-icon svg {
@@ -795,13 +807,12 @@
 }
 
 .vintrica-review-vignette-card__badge {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
+	display: inline-block;
 	width: fit-content;
 	padding: 0.15rem 0.45rem;
 	border-radius: 6px;
-	background: rgba(255, 255, 255, 0.18);
+	background: #ffffff;
+	color: #111827;
 	font-size: 0.6875rem;
 	font-weight: 700;
 	letter-spacing: 0.06em;
@@ -812,6 +823,7 @@
 	font-size: 0.9375rem;
 	font-weight: 650;
 	line-height: 1.35;
+	color: #ffffff;
 }
 
 .vintrica-review-vignette-card__price {
@@ -819,6 +831,7 @@
 	font-weight: 800;
 	line-height: 1.2;
 	white-space: nowrap;
+	color: #ffffff;
 }
 
 .vintrica-review-vignette-card__body {

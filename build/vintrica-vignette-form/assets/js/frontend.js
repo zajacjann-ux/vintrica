@@ -75,19 +75,6 @@
 		remove: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>'
 	};
 
-	function getCountryAccent(code) {
-		var accents = {
-			at: '#dc2626',
-			ch: '#b91c1c',
-			si: '#2563eb',
-			hu: '#059669',
-			cz: '#0891b2',
-			sk: '#4f46e5'
-		};
-
-		return accents[code] || '#4f46e5';
-	}
-
 	function createReviewDetail(label, value, iconKey) {
 		var detail = document.createElement('div');
 		detail.className = 'vintrica-review-vignette-card__detail';
@@ -1045,7 +1032,6 @@
 
 			card = document.createElement('article');
 			card.className = 'vintrica-review-vignette-card';
-			card.style.setProperty('--vintrica-card-accent', getCountryAccent(vignette.country));
 
 			header = document.createElement('header');
 			header.className = 'vintrica-review-vignette-card__header';
