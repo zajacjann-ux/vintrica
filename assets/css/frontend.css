@@ -1,0 +1,81 @@
+.vintrica-vignette-form-wrapper {
+	max-width: 640px;
+	margin: 0 auto;
+}
+
+.vintrica-vignette-form {
+	display: grid;
+	gap: 1.25rem;
+}
+
+.vintrica-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.vintrica-field label {
+	font-weight: 600;
+}
+
+.vintrica-field input,
+.vintrica-field select {
+	width: 100%;
+	padding: 0.625rem 0.75rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	font-size: 1rem;
+	line-height: 1.4;
+}
+
+.vintrica-field input:focus,
+.vintrica-field select:focus {
+	border-color: #2271b1;
+	outline: 2px solid transparent;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+
+.vintrica-field--submit {
+	margin-top: 0.5rem;
+}
+
+.vintrica-submit {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.75rem 1.5rem;
+	border: 0;
+	border-radius: 4px;
+	background-color: #2271b1;
+	color: #fff;
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.vintrica-submit:hover,
+.vintrica-submit:focus {
+	background-color: #135e96;
+}
+
+.vintrica-notice {
+	padding: 0.875rem 1rem;
+	margin-bottom: 1rem;
+	border-radius: 4px;
+}
+
+.vintrica-notice--success {
+	background-color: #edfaef;
+	border: 1px solid #68de7c;
+	color: #1e4620;
+}
+
+.vintrica-notice--error {
+	background-color: #fcf0f1;
+	border: 1px solid #f86368;
+	color: #3c1518;
+}
+
+.vintrica-notice p {
+	margin: 0;
+}
