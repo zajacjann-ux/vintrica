@@ -150,11 +150,34 @@ class Vintrica_Frontend {
 			'vignetteRemoved'           => __( 'Známka bola odstránená.', 'vintrica-vignette-form' ),
 			'plateLabel'                => __( 'ŠPZ', 'vintrica-vignette-form' ),
 			'startsLabel'               => __( 'Začiatok', 'vintrica-vignette-form' ),
-			'stepBuilder'               => __( 'Známky', 'vintrica-vignette-form' ),
+			'stepBuilder'               => __( 'Výber známok', 'vintrica-vignette-form' ),
 			'stepBilling'               => __( 'Fakturačné údaje', 'vintrica-vignette-form' ),
+			'stepReview'                => __( 'Kontrola objednávky', 'vintrica-vignette-form' ),
+			'stepPayment'               => __( 'Stripe platba', 'vintrica-vignette-form' ),
 			'backToBuilder'             => __( 'Späť na známky', 'vintrica-vignette-form' ),
-			'continueToBilling'         => __( 'Pokračovať k platbe', 'vintrica-vignette-form' ),
-			'submitOrder'               => __( 'Odoslať objednávku', 'vintrica-vignette-form' ),
+			'backToBilling'             => __( 'Späť na fakturačné údaje', 'vintrica-vignette-form' ),
+			'continueToBilling'         => __( 'Pokračovať k fakturačným údajom', 'vintrica-vignette-form' ),
+			'continueToReview'          => __( 'Pokračovať na kontrolu', 'vintrica-vignette-form' ),
+			'editVignettes'             => __( 'Upraviť známky', 'vintrica-vignette-form' ),
+			'payOrder'                  => __( 'Zaplatiť', 'vintrica-vignette-form' ),
+			'reviewTitle'               => __( 'Kontrola objednávky', 'vintrica-vignette-form' ),
+			'reviewBillingTitle'        => __( 'Fakturačné údaje', 'vintrica-vignette-form' ),
+			'reviewVignettesTitle'      => __( 'Vybrané známky', 'vintrica-vignette-form' ),
+			'labelVignetteCountry'      => __( 'Krajina známky', 'vintrica-vignette-form' ),
+			'labelValidity'             => __( 'Platnosť', 'vintrica-vignette-form' ),
+			'labelVehicleType'          => __( 'Typ vozidla', 'vintrica-vignette-form' ),
+			'labelRegistrationCountry'  => __( 'Krajina registrácie vozidla', 'vintrica-vignette-form' ),
+			'labelStartDate'            => __( 'Dátum začiatku platnosti', 'vintrica-vignette-form' ),
+			'labelPrice'                => __( 'Cena', 'vintrica-vignette-form' ),
+			'labelAddress'              => __( 'Adresa', 'vintrica-vignette-form' ),
+			'labelCompany'              => __( 'Firma', 'vintrica-vignette-form' ),
+			'labelFirstName'            => __( 'Meno', 'vintrica-vignette-form' ),
+			'labelLastName'             => __( 'Priezvisko', 'vintrica-vignette-form' ),
+			'labelEmail'                => __( 'E-mail', 'vintrica-vignette-form' ),
+			'labelPhone'                => __( 'Telefón', 'vintrica-vignette-form' ),
+			'labelIco'                  => __( 'IČO', 'vintrica-vignette-form' ),
+			'labelDic'                  => __( 'DIČ', 'vintrica-vignette-form' ),
+			'labelIcDph'                => __( 'IČ DPH', 'vintrica-vignette-form' ),
 		);
 	}
 
@@ -250,6 +273,24 @@ class Vintrica_Frontend {
 	}
 
 	/**
+	 * Check whether the current request indicates a successful Stripe payment.
+	 *
+	 * @return bool
+	 */
+	private function is_payment_success() {
+		return isset( $_GET['vintrica_paid'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['vintrica_paid'] ) );
+	}
+
+	/**
+	 * Check whether the current request indicates a cancelled Stripe payment.
+	 *
+	 * @return bool
+	 */
+	private function is_payment_cancelled() {
+		return isset( $_GET['vintrica_cancelled'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['vintrica_cancelled'] ) );
+	}
+
+	/**
 	 * Render the vignette order form.
 	 *
 	 * @param array|string $atts Shortcode attributes.
@@ -271,14 +312,28 @@ class Vintrica_Frontend {
 			<?php $this->render_notices( $notices ); ?>
 
 			<?php if ( $order_number ) : ?>
-				<div class="vintrica-notice vintrica-notice--success" role="status">
+				<div class="vintrica-notice vintrica-notice--<?php echo $this->is_payment_cancelled() ? 'error' : 'success'; ?>" role="status">
 					<p>
 						<?php
-						printf(
-							/* translators: %s: order number */
-							esc_html__( 'Objednávka %s bola úspešne prijatá. Platba cez Stripe bude čoskoro dostupná.', 'vintrica-vignette-form' ),
-							esc_html( $order_number )
-						);
+						if ( $this->is_payment_success() ) {
+							printf(
+								/* translators: %s: order number */
+								esc_html__( 'Objednávka %s bola úspešne uhradená. Ďakujeme za vašu platbu.', 'vintrica-vignette-form' ),
+								esc_html( $order_number )
+							);
+						} elseif ( $this->is_payment_cancelled() ) {
+							printf(
+								/* translators: %s: order number */
+								esc_html__( 'Platba objednávky %s bola zrušená. Môžete skúsiť znova.', 'vintrica-vignette-form' ),
+								esc_html( $order_number )
+							);
+						} else {
+							printf(
+								/* translators: %s: order number */
+								esc_html__( 'Objednávka %s bola prijatá. Stripe platba bude dostupná po nakonfigurovaní API kľúčov.', 'vintrica-vignette-form' ),
+								esc_html( $order_number )
+							);
+						}
 						?>
 					</p>
 				</div>
@@ -291,11 +346,19 @@ class Vintrica_Frontend {
 					<ol class="vintrica-steps" aria-label="<?php echo esc_attr__( 'Kroky objednávky', 'vintrica-vignette-form' ); ?>">
 						<li class="vintrica-steps__item is-active" data-vintrica-step-indicator="1">
 							<span class="vintrica-steps__number">1</span>
-							<span class="vintrica-steps__label"><?php echo esc_html__( 'Známky', 'vintrica-vignette-form' ); ?></span>
+							<span class="vintrica-steps__label"><?php echo esc_html__( 'Výber známok', 'vintrica-vignette-form' ); ?></span>
 						</li>
 						<li class="vintrica-steps__item" data-vintrica-step-indicator="2">
 							<span class="vintrica-steps__number">2</span>
 							<span class="vintrica-steps__label"><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></span>
+						</li>
+						<li class="vintrica-steps__item" data-vintrica-step-indicator="3">
+							<span class="vintrica-steps__number">3</span>
+							<span class="vintrica-steps__label"><?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?></span>
+						</li>
+						<li class="vintrica-steps__item" data-vintrica-step-indicator="4">
+							<span class="vintrica-steps__number">4</span>
+							<span class="vintrica-steps__label"><?php echo esc_html__( 'Stripe platba', 'vintrica-vignette-form' ); ?></span>
 						</li>
 					</ol>
 
@@ -402,7 +465,7 @@ class Vintrica_Frontend {
 
 						<div class="vintrica-field vintrica-field--submit">
 							<button type="button" class="vintrica-submit vintrica-continue-billing" disabled>
-								<?php echo esc_html__( 'Pokračovať k platbe', 'vintrica-vignette-form' ); ?>
+								<?php echo esc_html__( 'Pokračovať k fakturačným údajom', 'vintrica-vignette-form' ); ?>
 							</button>
 						</div>
 					</div>
@@ -506,8 +569,51 @@ class Vintrica_Frontend {
 							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-back-builder">
 								<?php echo esc_html__( 'Späť na známky', 'vintrica-vignette-form' ); ?>
 							</button>
-							<button type="submit" name="<?php echo esc_attr( self::CHECKOUT_SUBMIT_FIELD ); ?>" value="1" class="vintrica-submit vintrica-submit-order">
-								<?php echo esc_html__( 'Odoslať objednávku', 'vintrica-vignette-form' ); ?>
+							<button type="button" class="vintrica-submit vintrica-continue-review">
+								<?php echo esc_html__( 'Pokračovať na kontrolu', 'vintrica-vignette-form' ); ?>
+							</button>
+						</div>
+					</div>
+
+					<div class="vintrica-step vintrica-step--review" data-vintrica-step="3" hidden>
+						<section class="vintrica-builder__panel" aria-labelledby="vintrica-review-title">
+							<h2 id="vintrica-review-title" class="vintrica-builder__title">
+								<?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?>
+							</h2>
+
+							<h3 class="vintrica-review__subtitle"><?php echo esc_html__( 'Vybrané známky', 'vintrica-vignette-form' ); ?></h3>
+							<div class="vintrica-review-vignettes" aria-live="polite"></div>
+
+							<dl class="vintrica-summary-totals vintrica-review-totals">
+								<div class="vintrica-summary-totals__row">
+									<dt><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></dt>
+									<dd class="vintrica-review-subtotal">0</dd>
+								</div>
+								<div class="vintrica-summary-totals__row">
+									<dt><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></dt>
+									<dd class="vintrica-review-service-fee">0</dd>
+								</div>
+								<div class="vintrica-summary-totals__row vintrica-summary-totals__row--total">
+									<dt><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></dt>
+									<dd class="vintrica-review-total">0</dd>
+								</div>
+							</dl>
+
+							<h3 class="vintrica-review__subtitle"><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></h3>
+							<div class="vintrica-review-billing"></div>
+
+							<div class="vintrica-review-error vintrica-form-error" role="alert" hidden></div>
+						</section>
+
+						<div class="vintrica-review-actions">
+							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-back-billing">
+								<?php echo esc_html__( 'Späť na fakturačné údaje', 'vintrica-vignette-form' ); ?>
+							</button>
+							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-edit-vignettes">
+								<?php echo esc_html__( 'Upraviť známky', 'vintrica-vignette-form' ); ?>
+							</button>
+							<button type="submit" name="<?php echo esc_attr( self::CHECKOUT_SUBMIT_FIELD ); ?>" value="1" class="vintrica-submit vintrica-pay-submit">
+								<?php echo esc_html__( 'Zaplatiť', 'vintrica-vignette-form' ); ?>
 							</button>
 						</div>
 					</div>

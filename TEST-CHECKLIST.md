@@ -1,82 +1,64 @@
 # VINTRICA Vignette Form — Production Test Checklist
 
-Use this checklist after installing `vintrica-vignette-form-1.1.0.zip` on a staging WordPress site.
+Use this checklist after installing `vintrica-vignette-form-1.3.0.zip` on a staging WordPress site.
 
 ## Installation
 
 - [ ] Upload and activate the plugin without PHP warnings or fatal errors
-- [ ] Confirm **Plugins → VINTRICA Vignette Form** shows version **1.1.0**
+- [ ] Confirm **Plugins → VINTRICA Vignette Form** shows version **1.3.0**
 - [ ] Confirm **VINTRICA FORM** appears in the admin menu
-- [ ] Open the admin page and verify the shortcode `[vintrica_vignette_form]` is displayed
-- [ ] Confirm **Objednávky** submenu lists stored orders
+- [ ] Confirm **Objednávky** and **Stripe** submenus are available
 
 ## Shortcode & Assets
 
 - [ ] Create a test page containing `[vintrica_vignette_form]`
-- [ ] View the page while logged out and confirm the two-step builder renders
-- [ ] View page source and confirm `assets/css/frontend.css` is loaded
-- [ ] View page source and confirm `assets/js/frontend.js` is loaded
-- [ ] Confirm **jQuery is not** a dependency of `vintrica-frontend` in page source
-- [ ] Confirm `vintricaConfig` is present in a localized script block
+- [ ] View the page while logged out and confirm the four-step indicator renders
+- [ ] Confirm `assets/css/frontend.css` and `assets/js/frontend.js` are loaded
+- [ ] Confirm **jQuery is not** a dependency of `vintrica-frontend`
 
-## Step 1 — Vignette Builder
+## Step 1 — Výber známok
 
 - [ ] Validity dropdown is disabled until a country is selected
-- [ ] Changing country updates validity options and prices
 - [ ] Adding a vignette places it in the summary list
-- [ ] Summary shows correct vignette count
-- [ ] Subtotal matches server-defined prices
-- [ ] Service fee appears when at least one vignette is added
-- [ ] Total equals subtotal + service fee
-- [ ] **Edit** loads the vignette back into the form
-- [ ] **Update vignette** saves changes to the summary
-- [ ] **Cancel edit** restores add mode without corrupting the list
-- [ ] **Remove** deletes the selected vignette and updates totals
-- [ ] **Pokračovať k platbe** stays disabled until at least one vignette exists
-- [ ] Clicking **Pokračovať k platbe** advances to step 2 without a page reload
+- [ ] Totals update correctly
+- [ ] **Pokračovať k fakturačným údajom** stays disabled until at least one vignette exists
 
-## Step 2 — Billing & Order
+## Step 2 — Fakturačné údaje
 
-- [ ] Billing form shows all required fields (Meno, Priezvisko, E-mail, Telefón, Ulica, Mesto, PSČ, Krajina)
-- [ ] Optional fields (Firma, IČO, DIČ, IČ DPH) accept input
-- [ ] All three consent checkboxes are required
-- [ ] **Späť na známky** returns to step 1 without losing vignettes
-- [ ] Submitting with missing billing data shows a client-side validation message
-- [ ] Submitting a valid order redirects with `?vintrica_order=` and shows a success notice
-- [ ] Order appears in **VINTRICA FORM → Objednávky** with correct total and e-mail
-- [ ] Reloading after success does not resubmit the order
+- [ ] All billing fields and consent checkboxes render
+- [ ] **Pokračovať na kontrolu** validates billing client-side
+- [ ] **Späť na známky** returns to step 1 without losing data
 
-## Security & Validation
+## Step 3 — Kontrola objednávky
 
-- [ ] Tampering with hidden JSON is rejected server-side
-- [ ] Invalid country / validity combinations are rejected server-side
-- [ ] Nonce failure shows a security error message
-- [ ] Invalid e-mail is rejected server-side
+- [ ] All vignettes show country, validity, vehicle type, plate, registration country, start date, and price
+- [ ] Service fee and total are shown
+- [ ] Billing review shows name, email, phone, company fields, tax IDs, and address
+- [ ] **Odstrániť** removes a vignette from review
+- [ ] **Upraviť známky** returns to step 1
+- [ ] **Späť na fakturačné údaje** returns to step 2
 
-## Regression Checks
+## Step 4 — Stripe platba
 
-- [ ] Deactivate plugin without errors
-- [ ] Reactivate plugin without errors
-- [ ] WooCommerce is **not** required; plugin works without it
-- [ ] No JavaScript console errors on the form page
-- [ ] No PHP notices in `debug.log` when using `WP_DEBUG_LOG`
+- [ ] **Zaplatiť** creates an internal order only after review confirmation
+- [ ] With Stripe keys configured, user is redirected to Stripe Checkout
+- [ ] Without Stripe keys, order is stored and confirmation message appears
+- [ ] Successful return with `?vintrica_paid=1` marks order as **Uhradená**
+- [ ] Cancelled return marks order as **Zrušená**
 
-## Stripe (Prepared, Not Live)
+## Admin — Objednávky
 
-- [ ] Order is stored with status `pending_payment`
-- [ ] Stripe session payload is prepared in the database (no live payment redirect yet)
+- [ ] Orders list shows order number, date, customer name, email, vignette count, total, status badge, and actions
+- [ ] Clicking an order opens the detail page
+- [ ] Detail page shows billing, vignettes, price breakdown, Stripe session ID, and notes placeholder
+- [ ] Status can be changed manually with nonce-protected form
+- [ ] Only administrators can access order pages
 
 ## Build Verification (Developer)
-
-Run before creating a release ZIP:
 
 ```bash
 php bin/verify.php
 bash bin/build.sh
 ```
 
-Expected result:
-
-- All verification checks pass
-- ZIP created at `dist/vintrica-vignette-form-1.1.0.zip`
-- ZIP root folder is `vintrica-vignette-form/`
+Expected ZIP: `dist/vintrica-vignette-form-1.3.0.zip`

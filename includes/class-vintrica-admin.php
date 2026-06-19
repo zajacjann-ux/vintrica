@@ -18,10 +18,32 @@ class Vintrica_Admin {
 	const MENU_SLUG = 'vintrica-form';
 
 	/**
+	 * Orders submenu slug.
+	 */
+	const ORDERS_SLUG = 'vintrica-form-orders';
+
+	/**
+	 * Stripe settings submenu slug.
+	 */
+	const STRIPE_SLUG = 'vintrica-form-stripe';
+
+	/**
+	 * Nonce action for admin order actions.
+	 */
+	const ORDER_ACTION_NONCE = 'vintrica_admin_order_action';
+
+	/**
+	 * Nonce action for Stripe settings.
+	 */
+	const STRIPE_SETTINGS_NONCE = 'vintrica_admin_stripe_settings';
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_actions' ) );
 	}
 
 	/**
@@ -45,9 +67,114 @@ class Vintrica_Admin {
 			__( 'Objednávky', 'vintrica-vignette-form' ),
 			__( 'Objednávky', 'vintrica-vignette-form' ),
 			'manage_options',
-			self::MENU_SLUG . '-orders',
+			self::ORDERS_SLUG,
 			array( $this, 'render_orders_page' )
 		);
+
+		add_submenu_page(
+			self::MENU_SLUG,
+			__( 'Stripe', 'vintrica-vignette-form' ),
+			__( 'Stripe', 'vintrica-vignette-form' ),
+			'manage_options',
+			self::STRIPE_SLUG,
+			array( $this, 'render_stripe_settings_page' )
+		);
+	}
+
+	/**
+	 * Enqueue admin assets on plugin pages.
+	 *
+	 * @param string $hook Current admin page hook.
+	 * @return void
+	 */
+	public function enqueue_admin_assets( $hook ) {
+		if ( false === strpos( $hook, self::MENU_SLUG ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'vintrica-admin',
+			VINTRICA_PLUGIN_URL . 'assets/css/admin.css',
+			array(),
+			VINTRICA_VERSION
+		);
+	}
+
+	/**
+	 * Handle admin POST actions.
+	 *
+	 * @return void
+	 */
+	public function handle_admin_actions() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( isset( $_POST['vintrica_stripe_settings_submit'] ) ) {
+			$this->handle_stripe_settings_save();
+			return;
+		}
+
+		if ( isset( $_POST['vintrica_order_status_submit'], $_POST['order_id'], $_POST['order_status'] ) ) {
+			$this->handle_order_status_update();
+		}
+	}
+
+	/**
+	 * Save Stripe settings.
+	 *
+	 * @return void
+	 */
+	private function handle_stripe_settings_save() {
+		if ( ! isset( $_POST['vintrica_stripe_settings_nonce'] ) ) {
+			return;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_settings_nonce'] ) );
+
+		if ( ! wp_verify_nonce( $nonce, self::STRIPE_SETTINGS_NONCE ) ) {
+			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_nonce', __( 'Overenie bezpečnosti zlyhalo.', 'vintrica-vignette-form' ), 'error' );
+			return;
+		}
+
+		vintrica_vignette_form()->stripe->save_settings(
+			array(
+				'secret_key'      => isset( $_POST['vintrica_stripe_secret_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_secret_key'] ) ) : '',
+				'publishable_key' => isset( $_POST['vintrica_stripe_publishable_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_publishable_key'] ) ) : '',
+				'test_mode'       => ! empty( $_POST['vintrica_stripe_test_mode'] ),
+			)
+		);
+
+		add_settings_error( 'vintrica_stripe', 'vintrica_stripe_saved', __( 'Nastavenia Stripe boli uložené.', 'vintrica-vignette-form' ), 'updated' );
+	}
+
+	/**
+	 * Update order status from admin detail page.
+	 *
+	 * @return void
+	 */
+	private function handle_order_status_update() {
+		if ( ! isset( $_POST['vintrica_order_action_nonce'] ) ) {
+			return;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['vintrica_order_action_nonce'] ) );
+
+		if ( ! wp_verify_nonce( $nonce, self::ORDER_ACTION_NONCE ) ) {
+			add_settings_error( 'vintrica_orders', 'vintrica_order_nonce', __( 'Overenie bezpečnosti zlyhalo.', 'vintrica-vignette-form' ), 'error' );
+			return;
+		}
+
+		$order_id = (int) $_POST['order_id'];
+		$status   = sanitize_key( wp_unslash( $_POST['order_status'] ) );
+		$result   = vintrica_vignette_form()->orders->update_status( $order_id, $status );
+
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'vintrica_orders', 'vintrica_order_status', $result->get_error_message(), 'error' );
+			return;
+		}
+
+		add_settings_error( 'vintrica_orders', 'vintrica_order_status', __( 'Stav objednávky bol aktualizovaný.', 'vintrica-vignette-form' ), 'updated' );
 	}
 
 	/**
@@ -63,17 +190,20 @@ class Vintrica_Admin {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'VINTRICA FORM', 'vintrica-vignette-form' ); ?></h1>
-			<p><?php echo esc_html__( 'Objednávkový formulár diaľničných známok s dvojkrokovým checkoutom a prípravou Stripe platby.', 'vintrica-vignette-form' ); ?></p>
-			<p>
-				<code>[vintrica_vignette_form]</code>
-			</p>
-			<p><?php echo esc_html__( 'Krok 1: zostavenie známok. Krok 2: fakturačné údaje a odoslanie objednávky.', 'vintrica-vignette-form' ); ?></p>
+			<p><?php echo esc_html__( 'Objednávkový formulár diaľničných známok so štvorkrokovým checkoutom a Stripe platbou.', 'vintrica-vignette-form' ); ?></p>
+			<p><code>[vintrica_vignette_form]</code></p>
+			<ol>
+				<li><?php echo esc_html__( 'Výber známok', 'vintrica-vignette-form' ); ?></li>
+				<li><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></li>
+				<li><?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?></li>
+				<li><?php echo esc_html__( 'Stripe platba', 'vintrica-vignette-form' ); ?></li>
+			</ol>
 		</div>
 		<?php
 	}
 
 	/**
-	 * Render the orders admin page.
+	 * Render orders list or order detail.
 	 *
 	 * @return void
 	 */
@@ -82,38 +212,74 @@ class Vintrica_Admin {
 			wp_die( esc_html__( 'Nemáte oprávnenie na prístup k tejto stránke.', 'vintrica-vignette-form' ) );
 		}
 
-		$orders = vintrica_vignette_form()->orders->get_recent_orders( 50 );
+		settings_errors( 'vintrica_orders' );
+
+		if ( isset( $_GET['order_id'] ) ) {
+			$this->render_order_detail( (int) $_GET['order_id'] );
+			return;
+		}
+
+		$this->render_orders_list();
+	}
+
+	/**
+	 * Render orders list table.
+	 *
+	 * @return void
+	 */
+	private function render_orders_list() {
+		$orders = vintrica_vignette_form()->orders->get_recent_orders( 100 );
+		$orders_handler = vintrica_vignette_form()->orders;
 
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'Objednávky VINTRICA', 'vintrica-vignette-form' ); ?></h1>
-			<table class="widefat striped">
+			<table class="widefat striped vintrica-admin-table">
 				<thead>
 					<tr>
 						<th><?php echo esc_html__( 'Číslo objednávky', 'vintrica-vignette-form' ); ?></th>
-						<th><?php echo esc_html__( 'Stav', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Dátum', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Meno zákazníka', 'vintrica-vignette-form' ); ?></th>
 						<th><?php echo esc_html__( 'E-mail', 'vintrica-vignette-form' ); ?></th>
-						<th><?php echo esc_html__( 'Suma', 'vintrica-vignette-form' ); ?></th>
-						<th><?php echo esc_html__( 'Vytvorené', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Počet známok', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Stav objednávky', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Akcie', 'vintrica-vignette-form' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ( empty( $orders ) ) : ?>
 						<tr>
-							<td colspan="5"><?php echo esc_html__( 'Zatiaľ nie sú žiadne objednávky.', 'vintrica-vignette-form' ); ?></td>
+							<td colspan="8"><?php echo esc_html__( 'Zatiaľ nie sú žiadne objednávky.', 'vintrica-vignette-form' ); ?></td>
 						</tr>
 					<?php else : ?>
 						<?php foreach ( $orders as $order ) : ?>
 							<?php
-							$billing = json_decode( (string) $order->billing, true );
-							$email   = is_array( $billing ) && isset( $billing['email'] ) ? $billing['email'] : '';
+							$billing = $orders_handler->decode_billing( $order );
+							$email   = isset( $billing['email'] ) ? $billing['email'] : '';
+							$detail_url = add_query_arg(
+								array(
+									'page'     => self::ORDERS_SLUG,
+									'order_id' => (int) $order->id,
+								),
+								admin_url( 'admin.php' )
+							);
 							?>
 							<tr>
-								<td><?php echo esc_html( $order->order_number ); ?></td>
-								<td><?php echo esc_html( $order->status ); ?></td>
-								<td><?php echo esc_html( $email ); ?></td>
-								<td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->total, 2 ) ); ?></td>
+								<td>
+									<a href="<?php echo esc_url( $detail_url ); ?>"><?php echo esc_html( $order->order_number ); ?></a>
+								</td>
 								<td><?php echo esc_html( get_date_from_gmt( $order->created_at, 'd.m.Y H:i' ) ); ?></td>
+								<td><?php echo esc_html( $orders_handler->get_customer_name( $order ) ); ?></td>
+								<td><?php echo esc_html( $email ); ?></td>
+								<td><?php echo esc_html( (string) $orders_handler->count_vignettes( $order ) ); ?></td>
+								<td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->total, 2 ) ); ?></td>
+								<td><?php $this->render_status_badge( $order->status ); ?></td>
+								<td>
+									<a class="button button-small" href="<?php echo esc_url( $detail_url ); ?>">
+										<?php echo esc_html__( 'Detail', 'vintrica-vignette-form' ); ?>
+									</a>
+								</td>
 							</tr>
 						<?php endforeach; ?>
 					<?php endif; ?>
@@ -121,5 +287,215 @@ class Vintrica_Admin {
 			</table>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Render single order detail page.
+	 *
+	 * @param int $order_id Order ID.
+	 * @return void
+	 */
+	private function render_order_detail( $order_id ) {
+		$orders_handler = vintrica_vignette_form()->orders;
+		$pricing        = vintrica_vignette_form()->pricing;
+		$order          = $orders_handler->get_order( $order_id );
+
+		if ( ! $order ) {
+			echo '<div class="wrap"><p>' . esc_html__( 'Objednávka nebola nájdená.', 'vintrica-vignette-form' ) . '</p></div>';
+			return;
+		}
+
+		$billing   = $orders_handler->decode_billing( $order );
+		$vignettes = $orders_handler->decode_vignettes( $order );
+		$countries = $pricing->get_countries();
+		$vehicles  = $pricing->get_vehicle_types();
+		$list_url  = admin_url( 'admin.php?page=' . self::ORDERS_SLUG );
+
+		?>
+		<div class="wrap vintrica-order-detail">
+			<p><a href="<?php echo esc_url( $list_url ); ?>">&larr; <?php echo esc_html__( 'Späť na zoznam objednávok', 'vintrica-vignette-form' ); ?></a></p>
+			<h1><?php echo esc_html( $order->order_number ); ?></h1>
+
+			<div class="vintrica-order-detail__meta">
+				<p>
+					<strong><?php echo esc_html__( 'Stav:', 'vintrica-vignette-form' ); ?></strong>
+					<?php $this->render_status_badge( $order->status ); ?>
+				</p>
+				<p>
+					<strong><?php echo esc_html__( 'Vytvorené:', 'vintrica-vignette-form' ); ?></strong>
+					<?php echo esc_html( get_date_from_gmt( $order->created_at, 'd.m.Y H:i' ) ); ?>
+				</p>
+				<?php if ( ! empty( $order->stripe_session_id ) ) : ?>
+					<p>
+						<strong><?php echo esc_html__( 'Stripe session ID:', 'vintrica-vignette-form' ); ?></strong>
+						<code><?php echo esc_html( $order->stripe_session_id ); ?></code>
+					</p>
+				<?php endif; ?>
+			</div>
+
+			<h2><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></h2>
+			<table class="widefat striped vintrica-admin-table">
+				<tbody>
+					<tr><th><?php echo esc_html__( 'Meno', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['first_name'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'Priezvisko', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['last_name'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'E-mail', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['email'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'Telefón', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['phone'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'Firma', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['company'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'IČO', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['ico'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'DIČ', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['dic'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'IČ DPH', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $billing['ic_dph'] ?? '' ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'Adresa', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $this->format_address( $billing, $countries ) ); ?></td></tr>
+				</tbody>
+			</table>
+
+			<h2><?php echo esc_html__( 'Známky', 'vintrica-vignette-form' ); ?></h2>
+			<table class="widefat striped vintrica-admin-table">
+				<thead>
+					<tr>
+						<th><?php echo esc_html__( 'Krajina známky', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Platnosť', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Typ vozidla', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'ŠPZ', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Krajina registrácie', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Začiatok platnosti', 'vintrica-vignette-form' ); ?></th>
+						<th><?php echo esc_html__( 'Cena', 'vintrica-vignette-form' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $vignettes as $vignette ) : ?>
+						<?php
+						$country_code = $vignette['country'] ?? '';
+						$validity_code = $vignette['vignette_validity'] ?? '';
+						$price = $pricing->get_vignette_price( $country_code, $validity_code );
+						$price = null !== $price ? $price : 0;
+						?>
+						<tr>
+							<td><?php echo esc_html( $countries[ $country_code ] ?? $country_code ); ?></td>
+							<td><?php echo esc_html( $pricing->get_validity_label( $country_code, $validity_code ) ); ?></td>
+							<td><?php echo esc_html( $vehicles[ $vignette['vehicle_type'] ?? '' ] ?? ( $vignette['vehicle_type'] ?? '' ) ); ?></td>
+							<td><?php echo esc_html( $vignette['license_plate'] ?? '' ); ?></td>
+							<td><?php echo esc_html( $countries[ $vignette['registration_country'] ?? '' ] ?? ( $vignette['registration_country'] ?? '' ) ); ?></td>
+							<td><?php echo esc_html( $vignette['start_date'] ?? '' ); ?></td>
+							<td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( $price, 2 ) ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<h2><?php echo esc_html__( 'Rozpis ceny', 'vintrica-vignette-form' ); ?></h2>
+			<table class="widefat striped vintrica-admin-table">
+				<tbody>
+					<tr><th><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->subtotal, 2 ) ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->service_fee, 2 ) ); ?></td></tr>
+					<tr><th><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></th><td><strong><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->total, 2 ) ); ?></strong></td></tr>
+				</tbody>
+			</table>
+
+			<h2><?php echo esc_html__( 'Interné poznámky', 'vintrica-vignette-form' ); ?></h2>
+			<p class="description"><?php echo esc_html__( 'Miesto pre budúce interné poznámky k objednávke.', 'vintrica-vignette-form' ); ?></p>
+			<textarea class="large-text" rows="4" readonly placeholder="<?php echo esc_attr__( 'Interné poznámky budú dostupné v ďalšej verzii.', 'vintrica-vignette-form' ); ?>"></textarea>
+
+			<h2><?php echo esc_html__( 'Zmena stavu', 'vintrica-vignette-form' ); ?></h2>
+			<form method="post">
+				<?php wp_nonce_field( self::ORDER_ACTION_NONCE, 'vintrica_order_action_nonce' ); ?>
+				<input type="hidden" name="order_id" value="<?php echo esc_attr( (string) $order->id ); ?>" />
+				<select name="order_status">
+					<?php foreach ( $orders_handler->get_statuses() as $status_key => $status_label ) : ?>
+						<option value="<?php echo esc_attr( $status_key ); ?>" <?php selected( $orders_handler->normalize_status( $order->status ), $status_key ); ?>>
+							<?php echo esc_html( $status_label ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<button type="submit" name="vintrica_order_status_submit" value="1" class="button button-primary">
+					<?php echo esc_html__( 'Uložiť stav', 'vintrica-vignette-form' ); ?>
+				</button>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render Stripe settings page.
+	 *
+	 * @return void
+	 */
+	public function render_stripe_settings_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Nemáte oprávnenie na prístup k tejto stránke.', 'vintrica-vignette-form' ) );
+		}
+
+		settings_errors( 'vintrica_stripe' );
+
+		$stripe = vintrica_vignette_form()->stripe;
+
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html__( 'Nastavenia Stripe', 'vintrica-vignette-form' ); ?></h1>
+			<p><?php echo esc_html__( 'Zadajte Stripe API kľúče pre presmerovanie zákazníkov na Stripe Checkout po potvrdení objednávky.', 'vintrica-vignette-form' ); ?></p>
+			<form method="post">
+				<?php wp_nonce_field( self::STRIPE_SETTINGS_NONCE, 'vintrica_stripe_settings_nonce' ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="vintrica-stripe-secret-key"><?php echo esc_html__( 'Secret key', 'vintrica-vignette-form' ); ?></label></th>
+						<td><input type="password" class="regular-text" id="vintrica-stripe-secret-key" name="vintrica_stripe_secret_key" value="<?php echo esc_attr( $stripe->get_secret_key() ); ?>" autocomplete="off" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="vintrica-stripe-publishable-key"><?php echo esc_html__( 'Publishable key', 'vintrica-vignette-form' ); ?></label></th>
+						<td><input type="text" class="regular-text" id="vintrica-stripe-publishable-key" name="vintrica_stripe_publishable_key" value="<?php echo esc_attr( $stripe->get_publishable_key() ); ?>" autocomplete="off" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php echo esc_html__( 'Testovací režim', 'vintrica-vignette-form' ); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="vintrica_stripe_test_mode" value="1" <?php checked( $stripe->is_test_mode() ); ?> />
+								<?php echo esc_html__( 'Použiť testovacie Stripe kľúče', 'vintrica-vignette-form' ); ?>
+							</label>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button( __( 'Uložiť nastavenia', 'vintrica-vignette-form' ), 'primary', 'vintrica_stripe_settings_submit' ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render a status badge.
+	 *
+	 * @param string $status Order status.
+	 * @return void
+	 */
+	private function render_status_badge( $status ) {
+		$orders_handler = vintrica_vignette_form()->orders;
+		$normalized     = $orders_handler->normalize_status( $status );
+		$class          = 'vintrica-status-badge vintrica-status-badge--' . esc_attr( $normalized );
+
+		printf(
+			'<span class="%1$s">%2$s</span>',
+			esc_attr( $class ),
+			esc_html( $orders_handler->get_status_label( $status ) )
+		);
+	}
+
+	/**
+	 * Format billing address for display.
+	 *
+	 * @param array<string, mixed> $billing   Billing data.
+	 * @param array<string, string> $countries Country labels.
+	 * @return string
+	 */
+	private function format_address( array $billing, array $countries ) {
+		$parts = array_filter(
+			array(
+				isset( $billing['street'] ) ? trim( (string) $billing['street'] ) : '',
+				trim(
+					( isset( $billing['zip'] ) ? trim( (string) $billing['zip'] ) : '' ) . ' ' .
+					( isset( $billing['city'] ) ? trim( (string) $billing['city'] ) : '' )
+				),
+				isset( $billing['country'] ) ? ( $countries[ $billing['country'] ] ?? (string) $billing['country'] ) : '',
+			)
+		);
+
+		return implode( ', ', $parts );
 	}
 }

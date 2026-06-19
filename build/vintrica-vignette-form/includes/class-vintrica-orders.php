@@ -15,12 +15,27 @@ class Vintrica_Orders {
 	/**
 	 * Database version for schema upgrades.
 	 */
-	const DB_VERSION = '1.0.0';
+	const DB_VERSION = '1.1.0';
 
 	/**
 	 * Option key for stored DB version.
 	 */
 	const DB_VERSION_OPTION = 'vintrica_orders_db_version';
+
+	/**
+	 * Order status: paid.
+	 */
+	const STATUS_PAID = 'paid';
+
+	/**
+	 * Order status: unpaid.
+	 */
+	const STATUS_UNPAID = 'unpaid';
+
+	/**
+	 * Order status: cancelled.
+	 */
+	const STATUS_CANCELLED = 'cancelled';
 
 	/**
 	 * Get orders table name.
@@ -31,6 +46,50 @@ class Vintrica_Orders {
 		global $wpdb;
 
 		return $wpdb->prefix . 'vintrica_orders';
+	}
+
+	/**
+	 * Get allowed order statuses.
+	 *
+	 * @return array<string, string>
+	 */
+	public function get_statuses() {
+		return array(
+			self::STATUS_PAID      => __( 'Uhradená', 'vintrica-vignette-form' ),
+			self::STATUS_UNPAID    => __( 'Neuhradená', 'vintrica-vignette-form' ),
+			self::STATUS_CANCELLED => __( 'Zrušená', 'vintrica-vignette-form' ),
+		);
+	}
+
+	/**
+	 * Normalize a stored status value.
+	 *
+	 * @param string $status Raw status.
+	 * @return string
+	 */
+	public function normalize_status( $status ) {
+		$status = sanitize_key( $status );
+
+		if ( 'pending_payment' === $status ) {
+			return self::STATUS_UNPAID;
+		}
+
+		$statuses = $this->get_statuses();
+
+		return isset( $statuses[ $status ] ) ? $status : self::STATUS_UNPAID;
+	}
+
+	/**
+	 * Get localized status label.
+	 *
+	 * @param string $status Order status.
+	 * @return string
+	 */
+	public function get_status_label( $status ) {
+		$status   = $this->normalize_status( $status );
+		$statuses = $this->get_statuses();
+
+		return $statuses[ $status ] ?? $status;
 	}
 
 	/**
@@ -49,7 +108,7 @@ class Vintrica_Orders {
 		$sql = "CREATE TABLE {$table_name} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			order_number varchar(32) NOT NULL,
-			status varchar(32) NOT NULL DEFAULT 'pending_payment',
+			status varchar(32) NOT NULL DEFAULT 'unpaid',
 			vignettes longtext NOT NULL,
 			billing longtext NOT NULL,
 			subtotal decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -86,11 +145,13 @@ class Vintrica_Orders {
 			return $order_number;
 		}
 
+		$status = $this->normalize_status( $order_data['status'] ?? self::STATUS_UNPAID );
+
 		$inserted = $wpdb->insert(
 			$this->get_table_name(),
 			array(
 				'order_number'           => $order_number,
-				'status'                 => sanitize_key( $order_data['status'] ?? 'pending_payment' ),
+				'status'                 => $status,
 				'vignettes'              => wp_json_encode( $order_data['vignettes'] ),
 				'billing'                => wp_json_encode( $order_data['billing'] ),
 				'subtotal'               => (float) $order_data['totals']['subtotal'],
@@ -126,6 +187,37 @@ class Vintrica_Orders {
 		}
 
 		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Update order status.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param string $status   New status.
+	 * @return bool|WP_Error
+	 */
+	public function update_status( $order_id, $status ) {
+		global $wpdb;
+
+		$status = $this->normalize_status( $status );
+
+		if ( ! isset( $this->get_statuses()[ $status ] ) ) {
+			return new WP_Error(
+				'vintrica_invalid_status',
+				__( 'Neplatný stav objednávky.', 'vintrica-vignette-form' )
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $wpdb->update(
+			$this->get_table_name(),
+			array( 'status' => $status ),
+			array( 'id' => (int) $order_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return false !== $updated;
 	}
 
 	/**
@@ -198,7 +290,7 @@ class Vintrica_Orders {
 	 * @param int $limit Result limit.
 	 * @return array<int, object>
 	 */
-	public function get_recent_orders( $limit = 20 ) {
+	public function get_recent_orders( $limit = 50 ) {
 		global $wpdb;
 
 		$table_name = $this->get_table_name();
@@ -212,6 +304,55 @@ class Vintrica_Orders {
 		);
 
 		return is_array( $results ) ? $results : array();
+	}
+
+	/**
+	 * Decode vignettes JSON from an order row.
+	 *
+	 * @param object $order Order row.
+	 * @return array<int, array<string, string>>
+	 */
+	public function decode_vignettes( $order ) {
+		$decoded = json_decode( (string) $order->vignettes, true );
+
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
+	 * Decode billing JSON from an order row.
+	 *
+	 * @param object $order Order row.
+	 * @return array<string, mixed>
+	 */
+	public function decode_billing( $order ) {
+		$decoded = json_decode( (string) $order->billing, true );
+
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
+	 * Count vignettes in an order.
+	 *
+	 * @param object $order Order row.
+	 * @return int
+	 */
+	public function count_vignettes( $order ) {
+		return count( $this->decode_vignettes( $order ) );
+	}
+
+	/**
+	 * Get customer full name from billing data.
+	 *
+	 * @param object $order Order row.
+	 * @return string
+	 */
+	public function get_customer_name( $order ) {
+		$billing = $this->decode_billing( $order );
+
+		$first = isset( $billing['first_name'] ) ? trim( (string) $billing['first_name'] ) : '';
+		$last  = isset( $billing['last_name'] ) ? trim( (string) $billing['last_name'] ) : '';
+
+		return trim( $first . ' ' . $last );
 	}
 
 	/**

@@ -89,12 +89,22 @@
 		this.addButton = form.querySelector('.vintrica-add-vignette');
 		this.cancelButton = form.querySelector('.vintrica-cancel-edit');
 		this.continueButton = form.querySelector('.vintrica-continue-billing');
-		this.backButton = form.querySelector('.vintrica-back-builder');
-		this.submitButton = form.querySelector('.vintrica-submit-order');
+		this.continueReviewButton = form.querySelector('.vintrica-continue-review');
+		this.backBuilderButton = form.querySelector('.vintrica-back-builder');
+		this.backBillingButton = form.querySelector('.vintrica-back-billing');
+		this.editVignettesButton = form.querySelector('.vintrica-edit-vignettes');
+		this.payButton = form.querySelector('.vintrica-pay-submit');
 		this.billingError = form.querySelector('.vintrica-billing-error');
+		this.reviewError = form.querySelector('.vintrica-review-error');
 		this.stepBuilder = form.querySelector('.vintrica-step--builder');
 		this.stepBilling = form.querySelector('.vintrica-step--billing');
+		this.stepReview = form.querySelector('.vintrica-step--review');
 		this.stepIndicators = form.querySelectorAll('[data-vintrica-step-indicator]');
+		this.reviewVignettes = form.querySelector('.vintrica-review-vignettes');
+		this.reviewBilling = form.querySelector('.vintrica-review-billing');
+		this.reviewSubtotal = form.querySelector('.vintrica-review-subtotal');
+		this.reviewServiceFee = form.querySelector('.vintrica-review-service-fee');
+		this.reviewTotal = form.querySelector('.vintrica-review-total');
 		this.totalCount = form.querySelector('.vintrica-total-count');
 		this.totalSubtotal = form.querySelector('.vintrica-total-subtotal');
 		this.totalServiceFee = form.querySelector('.vintrica-total-service-fee');
@@ -105,6 +115,10 @@
 			last_name: form.querySelector('[name="vintrica_billing_last_name"]'),
 			email: form.querySelector('[name="vintrica_billing_email"]'),
 			phone: form.querySelector('[name="vintrica_billing_phone"]'),
+			company: form.querySelector('[name="vintrica_billing_company"]'),
+			ico: form.querySelector('[name="vintrica_billing_ico"]'),
+			dic: form.querySelector('[name="vintrica_billing_dic"]'),
+			ic_dph: form.querySelector('[name="vintrica_billing_ic_dph"]'),
 			street: form.querySelector('[name="vintrica_billing_street"]'),
 			city: form.querySelector('[name="vintrica_billing_city"]'),
 			zip: form.querySelector('[name="vintrica_billing_zip"]'),
@@ -150,14 +164,26 @@
 			self.goToStep(2);
 		});
 
-		this.backButton.addEventListener('click', function () {
+		this.continueReviewButton.addEventListener('click', function () {
+			self.goToStep(3);
+		});
+
+		this.backBuilderButton.addEventListener('click', function () {
+			self.goToStep(1);
+		});
+
+		this.backBillingButton.addEventListener('click', function () {
+			self.goToStep(2);
+		});
+
+		this.editVignettesButton.addEventListener('click', function () {
 			self.goToStep(1);
 		});
 
 		this.form.addEventListener('submit', function (event) {
 			var validation;
 
-			if (self.currentStep !== 2) {
+			if (self.currentStep !== 3) {
 				event.preventDefault();
 				return;
 			}
@@ -166,15 +192,16 @@
 
 			if (!validation.valid) {
 				event.preventDefault();
-				self.showBillingError(validation.message);
+				self.showReviewError(validation.message);
 				return;
 			}
 
-			self.clearBillingError();
+			self.clearReviewError();
 			self.persistState();
 			self.clearStorage();
-			self.submitButton.disabled = true;
-			self.submitButton.setAttribute('aria-busy', 'true');
+			self.goToStep(4);
+			self.payButton.disabled = true;
+			self.payButton.setAttribute('aria-busy', 'true');
 		});
 	};
 
@@ -193,11 +220,25 @@
 			this.persistState();
 		}
 
+		if (step === 3) {
+			validation = this.validateCheckout();
+
+			if (!validation.valid) {
+				this.showBillingError(validation.message);
+				return;
+			}
+
+			this.clearBillingError();
+			this.renderReview();
+		}
+
 		this.currentStep = step;
 		this.stepBuilder.hidden = step !== 1;
 		this.stepBuilder.classList.toggle('is-active', step === 1);
 		this.stepBilling.hidden = step !== 2;
 		this.stepBilling.classList.toggle('is-active', step === 2);
+		this.stepReview.hidden = step !== 3 && step !== 4;
+		this.stepReview.classList.toggle('is-active', step === 3 || step === 4);
 
 		this.stepIndicators.forEach(function (indicator) {
 			var indicatorStep = parseInt(indicator.getAttribute('data-vintrica-step-indicator'), 10);
@@ -208,6 +249,11 @@
 		if (step === 2) {
 			this.clearBillingError();
 			this.stepBilling.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
+
+		if (step === 3) {
+			this.clearReviewError();
+			this.stepReview.scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
 	};
 
@@ -329,6 +375,16 @@
 		this.billingError.hidden = true;
 	};
 
+	VintricaBuilder.prototype.showReviewError = function (message) {
+		this.reviewError.textContent = message;
+		this.reviewError.hidden = false;
+	};
+
+	VintricaBuilder.prototype.clearReviewError = function () {
+		this.reviewError.textContent = '';
+		this.reviewError.hidden = true;
+	};
+
 	VintricaBuilder.prototype.showFormSuccess = function (message) {
 		this.formSuccess.textContent = message;
 		this.formSuccess.hidden = false;
@@ -392,26 +448,27 @@
 		};
 	};
 
-	VintricaBuilder.prototype.validateCheckout = function () {
-		var continueValidation = this.validateContinue();
+	VintricaBuilder.prototype.validateBilling = function () {
 		var fieldKey;
 		var field;
 		var i;
 
-		if (!continueValidation.valid) {
-			return continueValidation;
-		}
-
 		for (fieldKey in this.billingFields) {
-			if (Object.prototype.hasOwnProperty.call(this.billingFields, fieldKey)) {
-				field = this.billingFields[fieldKey];
+			if (!Object.prototype.hasOwnProperty.call(this.billingFields, fieldKey)) {
+				continue;
+			}
 
-				if (!field || !String(field.value).trim()) {
-					return {
-						valid: false,
-						message: strings.validationBillingRequired
-					};
-				}
+			field = this.billingFields[fieldKey];
+
+			if (fieldKey === 'company' || fieldKey === 'ico' || fieldKey === 'dic' || fieldKey === 'ic_dph') {
+				continue;
+			}
+
+			if (!field || !String(field.value).trim()) {
+				return {
+					valid: false,
+					message: strings.validationBillingRequired
+				};
 			}
 		}
 
@@ -429,6 +486,26 @@
 					message: strings.validationConsentRequired
 				};
 			}
+		}
+
+		return {
+			valid: true,
+			message: ''
+		};
+	};
+
+	VintricaBuilder.prototype.validateCheckout = function () {
+		var continueValidation = this.validateContinue();
+		var billingValidation;
+
+		if (!continueValidation.valid) {
+			return continueValidation;
+		}
+
+		billingValidation = this.validateBilling();
+
+		if (!billingValidation.valid) {
+			return billingValidation;
 		}
 
 		return {
@@ -477,7 +554,7 @@
 		this.clearFormError();
 	};
 
-	VintricaBuilder.prototype.removeVignette = function (index) {
+	VintricaBuilder.prototype.removeVignette = function (index, fromReview) {
 		if (this.editingIndex === index) {
 			this.cancelEdit();
 		} else if (this.editingIndex !== null && index < this.editingIndex) {
@@ -485,8 +562,19 @@
 		}
 
 		this.vignettes.splice(index, 1);
-		this.showFormSuccess(strings.vignetteRemoved);
 		this.renderSummary();
+
+		if (fromReview) {
+			if (this.vignettes.length === 0) {
+				this.goToStep(1);
+				this.showFormError(strings.validationOrderEmpty);
+				return;
+			}
+
+			this.renderReview();
+		} else {
+			this.showFormSuccess(strings.vignetteRemoved);
+		}
 	};
 
 	VintricaBuilder.prototype.calculateTotals = function () {
@@ -561,7 +649,7 @@
 			removeButton.textContent = strings.remove;
 			removeButton.addEventListener('click', (function (index) {
 				return function () {
-					self.removeVignette(index);
+					self.removeVignette(index, false);
 				};
 			}(i)));
 
@@ -588,6 +676,91 @@
 		this.continueButton.disabled = this.vignettes.length === 0;
 
 		this.persistState();
+	};
+
+	VintricaBuilder.prototype.renderReview = function () {
+		var self = this;
+		var totals = this.calculateTotals();
+		var i;
+		var vignette;
+		var card;
+		var row;
+		var removeButton;
+		var price;
+		var addressParts;
+		var billingCountry;
+
+		this.reviewVignettes.innerHTML = '';
+
+		for (i = 0; i < this.vignettes.length; i += 1) {
+			vignette = this.vignettes[i];
+			price = getValidityPrice(vignette.country, vignette.vignette_validity);
+
+			card = document.createElement('article');
+			card.className = 'vintrica-review-card';
+
+			card.innerHTML =
+				'<dl class="vintrica-review-card__grid">' +
+				'<div><dt>' + strings.labelVignetteCountry + '</dt><dd>' + getCountryLabel(vignette.country) + '</dd></div>' +
+				'<div><dt>' + strings.labelValidity + '</dt><dd>' + getValidityLabel(vignette.country, vignette.vignette_validity) + '</dd></div>' +
+				'<div><dt>' + strings.labelVehicleType + '</dt><dd>' + getVehicleLabel(vignette.vehicle_type) + '</dd></div>' +
+				'<div><dt>' + strings.plateLabel + '</dt><dd>' + vignette.license_plate + '</dd></div>' +
+				'<div><dt>' + strings.labelRegistrationCountry + '</dt><dd>' + getCountryLabel(vignette.registration_country) + '</dd></div>' +
+				'<div><dt>' + strings.labelStartDate + '</dt><dd>' + vignette.start_date + '</dd></div>' +
+				'<div><dt>' + strings.labelPrice + '</dt><dd>' + formatPrice(price) + '</dd></div>' +
+				'</dl>';
+
+			row = document.createElement('div');
+			row.className = 'vintrica-review-card__actions';
+
+			removeButton = document.createElement('button');
+			removeButton.type = 'button';
+			removeButton.className = 'vintrica-button vintrica-button--link vintrica-button--danger';
+			removeButton.textContent = strings.remove;
+			removeButton.addEventListener('click', (function (index) {
+				return function () {
+					self.removeVignette(index, true);
+				};
+			}(i)));
+
+			row.appendChild(removeButton);
+			card.appendChild(row);
+			this.reviewVignettes.appendChild(card);
+		}
+
+		this.reviewSubtotal.textContent = formatPrice(totals.subtotal);
+		this.reviewServiceFee.textContent = formatPrice(totals.serviceFee);
+		this.reviewTotal.textContent = formatPrice(totals.total);
+
+		billingCountry = getCountryLabel(this.billingFields.country.value);
+		addressParts = [
+			this.billingFields.street.value.trim(),
+			(this.billingFields.zip.value.trim() + ' ' + this.billingFields.city.value.trim()).trim(),
+			billingCountry
+		].filter(function (part) {
+			return part;
+		});
+
+		this.reviewBilling.innerHTML =
+			'<dl class="vintrica-review-card__grid">' +
+			'<div><dt>' + strings.labelFirstName + '</dt><dd>' + this.escapeHtml(this.billingFields.first_name.value.trim()) + '</dd></div>' +
+			'<div><dt>' + strings.labelLastName + '</dt><dd>' + this.escapeHtml(this.billingFields.last_name.value.trim()) + '</dd></div>' +
+			'<div><dt>' + strings.labelEmail + '</dt><dd>' + this.escapeHtml(this.billingFields.email.value.trim()) + '</dd></div>' +
+			'<div><dt>' + strings.labelPhone + '</dt><dd>' + this.escapeHtml(this.billingFields.phone.value.trim()) + '</dd></div>' +
+			'<div><dt>' + strings.labelCompany + '</dt><dd>' + this.escapeHtml(this.billingFields.company.value.trim() || '—') + '</dd></div>' +
+			'<div><dt>' + strings.labelIco + '</dt><dd>' + this.escapeHtml(this.billingFields.ico.value.trim() || '—') + '</dd></div>' +
+			'<div><dt>' + strings.labelDic + '</dt><dd>' + this.escapeHtml(this.billingFields.dic.value.trim() || '—') + '</dd></div>' +
+			'<div><dt>' + strings.labelIcDph + '</dt><dd>' + this.escapeHtml(this.billingFields.ic_dph.value.trim() || '—') + '</dd></div>' +
+			'<div><dt>' + strings.labelAddress + '</dt><dd>' + this.escapeHtml(addressParts.join(', ')) + '</dd></div>' +
+			'</dl>';
+	};
+
+	VintricaBuilder.prototype.escapeHtml = function (value) {
+		return String(value)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
 	};
 
 	document.addEventListener('DOMContentLoaded', function () {

@@ -1,0 +1,42 @@
+.vintrica-status-badge {
+	display: inline-block;
+	padding: 0.2rem 0.55rem;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.vintrica-status-badge--paid {
+	background: #edfaef;
+	color: #1e4620;
+	border: 1px solid #68de7c;
+}
+
+.vintrica-status-badge--unpaid {
+	background: #fff8e5;
+	color: #8a4b00;
+	border: 1px solid #f0b849;
+}
+
+.vintrica-status-badge--cancelled {
+	background: #fcf0f1;
+	color: #3c1518;
+	border: 1px solid #f86368;
+}
+
+.vintrica-admin-table th {
+	width: 220px;
+}
+
+.vintrica-order-detail__meta {
+	margin: 1rem 0 1.5rem;
+	padding: 1rem;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+.vintrica-order-detail h2 {
+	margin-top: 2rem;
+}

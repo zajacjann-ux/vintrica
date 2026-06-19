@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.1.0' );
+		define( 'VINTRICA_VERSION', '1.3.0' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -509,6 +509,7 @@ $required_files = array(
 	'includes/class-vintrica-deactivator.php',
 	'assets/index.php',
 	'assets/css/frontend.css',
+	'assets/css/admin.css',
 	'assets/js/frontend.js',
 );
 
@@ -599,6 +600,8 @@ if ( ! isset( $GLOBALS['shortcode_tags']['vintrica_vignette_form'] ) ) {
 		vintrica_verify_fail( 'Shortcode output does not contain expected markup.' );
 	} elseif ( false === strpos( $shortcode_output, 'vintrica-step--billing' ) ) {
 		vintrica_verify_fail( 'Shortcode output does not contain billing step markup.' );
+	} elseif ( false === strpos( $shortcode_output, 'vintrica-step--review' ) ) {
+		vintrica_verify_fail( 'Shortcode output does not contain review step markup.' );
 	} elseif ( false === strpos( $shortcode_output, 'vintrica_billing_first_name' ) ) {
 		vintrica_verify_fail( 'Shortcode output does not contain billing form fields.' );
 	} else {
