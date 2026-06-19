@@ -58,7 +58,12 @@ class Vintrica_Admin {
 			<p>
 				<code>[vintrica_vignette_form]</code>
 			</p>
-			<p><?php echo esc_html__( 'Nastavenia prepojenia s WooCommerce budú dostupné v budúcej verzii.', 'vintrica-vignette-form' ); ?></p>
+			<p><?php echo esc_html__( 'Po odoslaní formulára sa známky pridajú do WooCommerce košíka a zákazník bude presmerovaný na pokladňu.', 'vintrica-vignette-form' ); ?></p>
+			<?php if ( ! vintrica_vignette_form()->woocommerce->is_woocommerce_active() ) : ?>
+				<div class="notice notice-warning inline">
+					<p><?php echo esc_html__( 'WooCommerce nie je nainštalovaný alebo aktivovaný. Objednávky známok nie je možné spracovať.', 'vintrica-vignette-form' ); ?></p>
+				</div>
+			<?php endif; ?>
 		</div>
 		<?php
 	}

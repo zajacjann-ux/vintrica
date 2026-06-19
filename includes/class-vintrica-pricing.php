@@ -206,6 +206,62 @@ class Vintrica_Pricing {
 	}
 
 	/**
+	 * Get localized country label by code.
+	 *
+	 * @param string $code Country code.
+	 * @return string
+	 */
+	public function get_country_label( $code ) {
+		$countries = $this->get_countries();
+
+		return isset( $countries[ $code ] ) ? $countries[ $code ] : $code;
+	}
+
+	/**
+	 * Get localized vehicle type label by code.
+	 *
+	 * @param string $code Vehicle type code.
+	 * @return string
+	 */
+	public function get_vehicle_type_label( $code ) {
+		$types = $this->get_vehicle_types();
+
+		return isset( $types[ $code ] ) ? $types[ $code ] : $code;
+	}
+
+	/**
+	 * Get localized validity label by country and validity code.
+	 *
+	 * @param string $country  Country code.
+	 * @param string $validity Validity code.
+	 * @return string
+	 */
+	public function get_validity_label( $country, $validity ) {
+		$validities = $this->get_country_validities();
+
+		if ( isset( $validities[ $country ][ $validity ]['label'] ) ) {
+			return $validities[ $country ][ $validity ]['label'];
+		}
+
+		return $validity;
+	}
+
+	/**
+	 * Build a cart line title for a vignette.
+	 *
+	 * @param array $vignette Sanitized vignette data.
+	 * @return string
+	 */
+	public function get_vignette_line_title( array $vignette ) {
+		return sprintf(
+			/* translators: 1: country label, 2: validity label */
+			__( 'Diaľničná známka – %1$s (%2$s)', 'vintrica-vignette-form' ),
+			$this->get_country_label( $vignette['country'] ),
+			$this->get_validity_label( $vignette['country'], $vignette['vignette_validity'] )
+		);
+	}
+
+	/**
 	 * Build frontend-safe configuration for JavaScript.
 	 *
 	 * @return array<string, mixed>
