@@ -7,6 +7,8 @@
 
 	var config = window.vintricaConfig.config;
 	var strings = window.vintricaConfig.strings;
+	var checkoutReady = !!window.vintricaConfig.checkoutReady;
+	var storageKey = window.vintricaConfig.storageKey || 'vintrica_vignettes_default';
 
 	function formatPrice(amount) {
 		return config.currency + ' ' + amount.toFixed(2);
@@ -64,6 +66,7 @@
 		this.form = form;
 		this.vignettes = [];
 		this.editingIndex = null;
+		this.storageKey = storageKey;
 
 		this.fields = {
 			country: form.querySelector('[data-vintrica-field="country"]'),
@@ -78,6 +81,8 @@
 		this.summaryList = form.querySelector('.vintrica-summary-list');
 		this.summaryEmpty = form.querySelector('.vintrica-summary-empty');
 		this.formError = form.querySelector('.vintrica-form-error');
+		this.formSuccess = form.querySelector('.vintrica-form-success');
+		this.continueNotice = form.querySelector('.vintrica-continue-notice');
 		this.addButton = form.querySelector('.vintrica-add-vignette');
 		this.cancelButton = form.querySelector('.vintrica-cancel-edit');
 		this.submitButton = form.querySelector('.vintrica-submit');
@@ -87,6 +92,7 @@
 		this.totalAmount = form.querySelector('.vintrica-total-amount');
 
 		this.bindEvents();
+		this.loadFromStorage();
 		this.renderSummary();
 	}
 
@@ -107,6 +113,23 @@
 		});
 
 		this.form.addEventListener('submit', function (event) {
+			var validation = self.validateContinue();
+
+			if (!validation.valid) {
+				event.preventDefault();
+				self.clearContinueNotice();
+				self.showFormError(validation.message);
+				return;
+			}
+
+			if (!checkoutReady) {
+				event.preventDefault();
+				self.clearFormError();
+				self.persistState();
+				self.showContinueNotice(strings.woocommerceNotReady);
+				return;
+			}
+
 			if (!self.prepareSubmit()) {
 				event.preventDefault();
 				return;
@@ -115,6 +138,47 @@
 			self.submitButton.disabled = true;
 			self.submitButton.setAttribute('aria-busy', 'true');
 		});
+	};
+
+	VintricaBuilder.prototype.loadFromStorage = function () {
+		var stored;
+		var parsed;
+
+		if (!window.localStorage) {
+			return;
+		}
+
+		try {
+			stored = window.localStorage.getItem(this.storageKey);
+
+			if (!stored) {
+				return;
+			}
+
+			parsed = JSON.parse(stored);
+
+			if (Array.isArray(parsed)) {
+				this.vignettes = parsed;
+			}
+		} catch (error) {
+			this.vignettes = [];
+		}
+	};
+
+	VintricaBuilder.prototype.persistState = function () {
+		var payload = JSON.stringify(this.vignettes);
+
+		this.hiddenInput.value = payload;
+
+		if (!window.localStorage) {
+			return;
+		}
+
+		try {
+			window.localStorage.setItem(this.storageKey, payload);
+		} catch (error) {
+			// Ignore storage quota or privacy mode errors.
+		}
 	};
 
 	VintricaBuilder.prototype.populateValidities = function (countryCode) {
@@ -127,7 +191,7 @@
 
 		option = document.createElement('option');
 		option.value = '';
-		option.textContent = countryCode ? strings.selectValidity : strings.selectCountry;
+		option.textContent = countryCode ? strings.selectValidity : strings.selectCountryFirst;
 		select.appendChild(option);
 
 		for (i = 0; i < options.length; i += 1) {
@@ -176,11 +240,33 @@
 	VintricaBuilder.prototype.showFormError = function (message) {
 		this.formError.textContent = message;
 		this.formError.hidden = false;
+		this.clearFormSuccess();
 	};
 
 	VintricaBuilder.prototype.clearFormError = function () {
 		this.formError.textContent = '';
 		this.formError.hidden = true;
+	};
+
+	VintricaBuilder.prototype.showFormSuccess = function (message) {
+		this.formSuccess.textContent = message;
+		this.formSuccess.hidden = false;
+		this.clearFormError();
+	};
+
+	VintricaBuilder.prototype.clearFormSuccess = function () {
+		this.formSuccess.textContent = '';
+		this.formSuccess.hidden = true;
+	};
+
+	VintricaBuilder.prototype.showContinueNotice = function (message) {
+		this.continueNotice.textContent = message;
+		this.continueNotice.hidden = false;
+	};
+
+	VintricaBuilder.prototype.clearContinueNotice = function () {
+		this.continueNotice.textContent = '';
+		this.continueNotice.hidden = true;
 	};
 
 	VintricaBuilder.prototype.validateBuilderFields = function (values) {
@@ -200,22 +286,61 @@
 		return getValidityPrice(values.country, values.vignette_validity) > 0;
 	};
 
+	VintricaBuilder.prototype.validateContinue = function () {
+		var i;
+		var vignette;
+
+		if (this.vignettes.length === 0) {
+			return {
+				valid: false,
+				message: strings.validationOrderEmpty
+			};
+		}
+
+		for (i = 0; i < this.vignettes.length; i += 1) {
+			vignette = this.vignettes[i];
+
+			if (!vignette.license_plate || !String(vignette.license_plate).trim()) {
+				return {
+					valid: false,
+					message: strings.validationInvalidData
+				};
+			}
+
+			if (!vignette.start_date || !String(vignette.start_date).trim()) {
+				return {
+					valid: false,
+					message: strings.validationInvalidData
+				};
+			}
+		}
+
+		return {
+			valid: true,
+			message: ''
+		};
+	};
+
 	VintricaBuilder.prototype.handleAddOrUpdate = function () {
 		var values = this.getFieldValues();
+		var wasEditing = this.editingIndex !== null;
 
 		this.clearFormError();
+		this.clearContinueNotice();
 
 		if (!this.validateBuilderFields(values)) {
 			this.showFormError(strings.validationRequired);
 			return;
 		}
 
-		if (this.editingIndex !== null) {
+		if (wasEditing) {
 			this.vignettes[this.editingIndex] = values;
 			this.cancelEdit();
+			this.showFormSuccess(strings.vignetteUpdated);
 		} else {
 			this.vignettes.push(values);
 			this.clearBuilderFields();
+			this.showFormSuccess(strings.vignetteAdded);
 		}
 
 		this.renderSummary();
@@ -227,6 +352,7 @@
 		this.addButton.textContent = strings.updateVignette;
 		this.cancelButton.hidden = false;
 		this.clearFormError();
+		this.clearContinueNotice();
 	};
 
 	VintricaBuilder.prototype.cancelEdit = function () {
@@ -245,6 +371,7 @@
 		}
 
 		this.vignettes.splice(index, 1);
+		this.showFormSuccess(strings.vignetteRemoved);
 		this.renderSummary();
 	};
 
@@ -346,7 +473,7 @@
 		this.totalAmount.textContent = formatPrice(totals.total);
 		this.submitButton.disabled = this.vignettes.length === 0;
 
-		this.hiddenInput.value = JSON.stringify(this.vignettes);
+		this.persistState();
 	};
 
 	VintricaBuilder.prototype.prepareSubmit = function () {
@@ -357,7 +484,7 @@
 			return false;
 		}
 
-		this.hiddenInput.value = JSON.stringify(this.vignettes);
+		this.persistState();
 		return true;
 	};
 

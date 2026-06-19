@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
- * Description:       Vignette order form for WooCommerce integration.
+ * Description:       Objednávkový formulár diaľničných známok pre WooCommerce.
  * Version:           1.0.0
  * Requires at least: 6.0
  * Requires PHP:      7.4

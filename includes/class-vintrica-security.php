@@ -112,13 +112,13 @@ class Vintrica_Security {
 		$raw_json = wp_unslash( $raw_json );
 
 		if ( ! is_string( $raw_json ) || '' === trim( $raw_json ) ) {
-			return new WP_Error( 'vintrica_empty_order', __( 'No vignettes were submitted.', 'vintrica-vignette-form' ) );
+			return new WP_Error( 'vintrica_empty_order', __( 'Neboli odoslané žiadne známky.', 'vintrica-vignette-form' ) );
 		}
 
 		$decoded = json_decode( $raw_json, true );
 
 		if ( ! is_array( $decoded ) || empty( $decoded ) ) {
-			return new WP_Error( 'vintrica_invalid_order', __( 'Invalid vignette order data.', 'vintrica-vignette-form' ) );
+			return new WP_Error( 'vintrica_invalid_order', __( 'Neplatné údaje objednávky známok.', 'vintrica-vignette-form' ) );
 		}
 
 		$countries     = $this->pricing->get_countries();
@@ -132,7 +132,7 @@ class Vintrica_Security {
 					'vintrica_invalid_item',
 					sprintf(
 						/* translators: %d: vignette index */
-						__( 'Invalid vignette at position %d.', 'vintrica-vignette-form' ),
+						__( 'Neplatná známka na pozícii %d.', 'vintrica-vignette-form' ),
 						(int) $index + 1
 					)
 				);
@@ -145,23 +145,23 @@ class Vintrica_Security {
 			}
 
 			if ( ! isset( $countries[ $vignette['country'] ] ) ) {
-				return new WP_Error( 'vintrica_invalid_country', __( 'Invalid country selected.', 'vintrica-vignette-form' ) );
+				return new WP_Error( 'vintrica_invalid_country', __( 'Neplatná krajina.', 'vintrica-vignette-form' ) );
 			}
 
 			if ( ! isset( $vehicle_types[ $vignette['vehicle_type'] ] ) ) {
-				return new WP_Error( 'vintrica_invalid_vehicle', __( 'Invalid vehicle type selected.', 'vintrica-vignette-form' ) );
+				return new WP_Error( 'vintrica_invalid_vehicle', __( 'Neplatný typ vozidla.', 'vintrica-vignette-form' ) );
 			}
 
 			if ( ! isset( $validities[ $vignette['country'] ][ $vignette['vignette_validity'] ] ) ) {
-				return new WP_Error( 'vintrica_invalid_validity', __( 'Invalid vignette validity for the selected country.', 'vintrica-vignette-form' ) );
+				return new WP_Error( 'vintrica_invalid_validity', __( 'Neplatná platnosť známky pre zvolenú krajinu.', 'vintrica-vignette-form' ) );
 			}
 
 			if ( ! isset( $countries[ $vignette['registration_country'] ] ) ) {
-				return new WP_Error( 'vintrica_invalid_registration', __( 'Invalid registration country selected.', 'vintrica-vignette-form' ) );
+				return new WP_Error( 'vintrica_invalid_registration', __( 'Neplatná krajina registrácie vozidla.', 'vintrica-vignette-form' ) );
 			}
 
 			if ( empty( $vignette['start_date'] ) || empty( $vignette['license_plate'] ) ) {
-				return new WP_Error( 'vintrica_missing_fields', __( 'Each vignette must include a start date and license plate.', 'vintrica-vignette-form' ) );
+				return new WP_Error( 'vintrica_missing_fields', __( 'Každá známka musí obsahovať dátum začiatku platnosti a ŠPZ.', 'vintrica-vignette-form' ) );
 			}
 
 			$sanitized[] = $vignette;
@@ -185,7 +185,7 @@ class Vintrica_Security {
 					'vintrica_missing_field',
 					sprintf(
 						/* translators: %s: field name */
-						__( 'Missing required field: %s', 'vintrica-vignette-form' ),
+						__( 'Chýba povinné pole: %s', 'vintrica-vignette-form' ),
 						esc_html( $field_key )
 					)
 				);

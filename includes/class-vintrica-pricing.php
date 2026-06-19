@@ -54,12 +54,12 @@ class Vintrica_Pricing {
 		return apply_filters(
 			'vintrica_vignette_countries',
 			array(
-				'at' => __( 'Austria', 'vintrica-vignette-form' ),
-				'ch' => __( 'Switzerland', 'vintrica-vignette-form' ),
-				'cz' => __( 'Czech Republic', 'vintrica-vignette-form' ),
-				'hu' => __( 'Hungary', 'vintrica-vignette-form' ),
-				'si' => __( 'Slovenia', 'vintrica-vignette-form' ),
-				'sk' => __( 'Slovakia', 'vintrica-vignette-form' ),
+				'at' => __( 'Rakúsko', 'vintrica-vignette-form' ),
+				'ch' => __( 'Švajčiarsko', 'vintrica-vignette-form' ),
+				'cz' => __( 'Česko', 'vintrica-vignette-form' ),
+				'hu' => __( 'Maďarsko', 'vintrica-vignette-form' ),
+				'si' => __( 'Slovinsko', 'vintrica-vignette-form' ),
+				'sk' => __( 'Slovensko', 'vintrica-vignette-form' ),
 			)
 		);
 	}
@@ -78,10 +78,10 @@ class Vintrica_Pricing {
 		return apply_filters(
 			'vintrica_vignette_vehicle_types',
 			array(
-				'car'        => __( 'Car', 'vintrica-vignette-form' ),
-				'motorcycle' => __( 'Motorcycle', 'vintrica-vignette-form' ),
-				'van'        => __( 'Van', 'vintrica-vignette-form' ),
-				'trailer'    => __( 'Trailer', 'vintrica-vignette-form' ),
+				'car'        => __( 'Osobné vozidlo', 'vintrica-vignette-form' ),
+				'motorcycle' => __( 'Motocykel', 'vintrica-vignette-form' ),
+				'van'        => __( 'Dodávka', 'vintrica-vignette-form' ),
+				'trailer'    => __( 'Príves', 'vintrica-vignette-form' ),
 			)
 		);
 	}
@@ -102,85 +102,85 @@ class Vintrica_Pricing {
 			array(
 				'at' => array(
 					'10d' => array(
-						'label' => __( '10 days', 'vintrica-vignette-form' ),
+						'label' => __( '10 dní', 'vintrica-vignette-form' ),
 						'price' => 9.90,
 					),
 					'2m'  => array(
-						'label' => __( '2 months', 'vintrica-vignette-form' ),
+						'label' => __( '2 mesiace', 'vintrica-vignette-form' ),
 						'price' => 28.90,
 					),
 					'1y'  => array(
-						'label' => __( '1 year', 'vintrica-vignette-form' ),
+						'label' => __( '1 rok', 'vintrica-vignette-form' ),
 						'price' => 96.40,
 					),
 				),
 				'ch' => array(
 					'1d'  => array(
-						'label' => __( '1 day', 'vintrica-vignette-form' ),
+						'label' => __( '1 deň', 'vintrica-vignette-form' ),
 						'price' => 8.30,
 					),
 					'7d'  => array(
-						'label' => __( '7 days', 'vintrica-vignette-form' ),
+						'label' => __( '7 dní', 'vintrica-vignette-form' ),
 						'price' => 32.00,
 					),
 					'1y'  => array(
-						'label' => __( '1 year', 'vintrica-vignette-form' ),
+						'label' => __( '1 rok', 'vintrica-vignette-form' ),
 						'price' => 40.00,
 					),
 				),
 				'cz' => array(
 					'10d' => array(
-						'label' => __( '10 days', 'vintrica-vignette-form' ),
+						'label' => __( '10 dní', 'vintrica-vignette-form' ),
 						'price' => 12.00,
 					),
 					'1m'  => array(
-						'label' => __( '1 month', 'vintrica-vignette-form' ),
+						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
 						'price' => 16.00,
 					),
 					'1y'  => array(
-						'label' => __( '1 year', 'vintrica-vignette-form' ),
+						'label' => __( '1 rok', 'vintrica-vignette-form' ),
 						'price' => 150.00,
 					),
 				),
 				'hu' => array(
 					'10d' => array(
-						'label' => __( '10 days', 'vintrica-vignette-form' ),
+						'label' => __( '10 dní', 'vintrica-vignette-form' ),
 						'price' => 15.00,
 					),
 					'1m'  => array(
-						'label' => __( '1 month', 'vintrica-vignette-form' ),
+						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
 						'price' => 22.00,
 					),
 					'1y'  => array(
-						'label' => __( '1 year', 'vintrica-vignette-form' ),
+						'label' => __( '1 rok', 'vintrica-vignette-form' ),
 						'price' => 155.00,
 					),
 				),
 				'si' => array(
 					'7d'  => array(
-						'label' => __( '7 days', 'vintrica-vignette-form' ),
+						'label' => __( '7 dní', 'vintrica-vignette-form' ),
 						'price' => 16.00,
 					),
 					'1m'  => array(
-						'label' => __( '1 month', 'vintrica-vignette-form' ),
+						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
 						'price' => 32.00,
 					),
 					'1y'  => array(
-						'label' => __( '1 year', 'vintrica-vignette-form' ),
+						'label' => __( '1 rok', 'vintrica-vignette-form' ),
 						'price' => 110.00,
 					),
 				),
 				'sk' => array(
 					'10d' => array(
-						'label' => __( '10 days', 'vintrica-vignette-form' ),
+						'label' => __( '10 dní', 'vintrica-vignette-form' ),
 						'price' => 12.00,
 					),
 					'1m'  => array(
-						'label' => __( '1 month', 'vintrica-vignette-form' ),
+						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
 						'price' => 17.00,
 					),
 					'1y'  => array(
-						'label' => __( '1 year', 'vintrica-vignette-form' ),
+						'label' => __( '1 rok', 'vintrica-vignette-form' ),
 						'price' => 60.00,
 					),
 				),
@@ -214,11 +214,11 @@ class Vintrica_Pricing {
 		$countries  = $this->get_countries();
 		$validities = $this->get_country_validities();
 		$config     = array(
-			'currency'   => $this->get_currency(),
-			'serviceFee' => $this->get_service_fee(),
-			'countries'  => array(),
+			'currency'     => $this->get_currency(),
+			'serviceFee'   => $this->get_service_fee(),
+			'countries'    => array(),
 			'vehicleTypes' => array(),
-			'validities' => array(),
+			'validities'   => array(),
 		);
 
 		foreach ( $countries as $code => $label ) {
