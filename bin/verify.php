@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.0.2' );
+		define( 'VINTRICA_VERSION', '1.1.0' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -345,6 +345,49 @@ function vintrica_bootstrap_wordpress_stubs() {
 		}
 	}
 
+	if ( ! function_exists( 'dbDelta' ) ) {
+		function dbDelta( $queries ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+			return array();
+		}
+	}
+
+	if ( ! function_exists( 'current_user_can' ) ) {
+		function current_user_can( $capability ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'get_the_ID' ) ) {
+		function get_the_ID() {
+			return 42;
+		}
+	}
+
+	if ( ! function_exists( 'add_query_arg' ) ) {
+		function add_query_arg( $args, $url ) {
+			$query = http_build_query( $args );
+			return strpos( $url, '?' ) !== false ? $url . '&' . $query : $url . '?' . $query;
+		}
+	}
+
+	if ( ! function_exists( 'wp_safe_redirect' ) ) {
+		function wp_safe_redirect( $location ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'sanitize_email' ) ) {
+		function sanitize_email( $email ) {
+			return filter_var( (string) $email, FILTER_SANITIZE_EMAIL );
+		}
+	}
+
+	if ( ! function_exists( 'is_email' ) ) {
+		function is_email( $email ) {
+			return false !== filter_var( (string) $email, FILTER_VALIDATE_EMAIL );
+		}
+	}
+
 	if ( ! function_exists( 'wp_die' ) ) {
 		function wp_die( $message ) {
 			throw new RuntimeException( (string) $message );
@@ -375,8 +418,11 @@ function vintrica_bootstrap_wordpress_stubs() {
 
 	if ( ! isset( $GLOBALS['wpdb'] ) ) {
 		$GLOBALS['wpdb'] = new class() {
+			public $prefix = 'wp_';
 			public $options = 'wp_options';
 			public $queries = array();
+			public $insert_id = 1;
+			public $last_error = '';
 
 			public function esc_like( $text ) {
 				return addcslashes( (string) $text, '_%\\' );
@@ -390,11 +436,63 @@ function vintrica_bootstrap_wordpress_stubs() {
 				$this->queries[] = $query;
 				return 0;
 			}
+
+			public function insert( $table, $data, $format = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+				$this->queries[] = 'INSERT INTO ' . $table;
+				return 1;
+			}
+
+			public function update( $table, $data, $where, $format = null, $where_format = null ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+				$this->queries[] = 'UPDATE ' . $table;
+				return 1;
+			}
+
+			public function get_row( $query ) {
+				if ( false !== strpos( $query, 'order_number' ) ) {
+					return (object) array(
+						'id'            => 1,
+						'order_number'  => 'VIN-20260618-000001',
+						'status'        => 'pending_payment',
+						'vignettes'     => '[]',
+						'billing'       => '{}',
+						'subtotal'      => 0,
+						'service_fee'   => 0,
+						'total'         => 0,
+						'currency'      => 'EUR',
+						'created_at'    => gmdate( 'Y-m-d H:i:s' ),
+					);
+				}
+
+				return null;
+			}
+
+			public function get_results( $query ) {
+				return array();
+			}
+
+			public function get_charset_collate() {
+				return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+			}
 		};
 	}
 }
 
 vintrica_bootstrap_wordpress_stubs();
+
+$upgrade_stub = ABSPATH . 'wp-admin/includes/upgrade.php';
+
+if ( ! file_exists( $upgrade_stub ) ) {
+	$upgrade_dir = dirname( $upgrade_stub );
+
+	if ( ! is_dir( $upgrade_dir ) ) {
+		mkdir( $upgrade_dir, 0777, true );
+	}
+
+	file_put_contents(
+		$upgrade_stub,
+		"<?php\nif ( ! function_exists( 'dbDelta' ) ) {\n\tfunction dbDelta( \$queries ) {\n\t\treturn array();\n\t}\n}\n"
+	);
+}
 
 $required_files = array(
 	'vintrica-vignette-form.php',
@@ -402,9 +500,11 @@ $required_files = array(
 	'includes/index.php',
 	'includes/class-vintrica-pricing.php',
 	'includes/class-vintrica-security.php',
+	'includes/class-vintrica-orders.php',
+	'includes/class-vintrica-stripe.php',
+	'includes/class-vintrica-checkout.php',
 	'includes/class-vintrica-admin.php',
 	'includes/class-vintrica-frontend.php',
-	'includes/class-vintrica-woocommerce.php',
 	'includes/class-vintrica-activator.php',
 	'includes/class-vintrica-deactivator.php',
 	'assets/index.php',
@@ -497,8 +597,12 @@ if ( ! isset( $GLOBALS['shortcode_tags']['vintrica_vignette_form'] ) ) {
 		vintrica_verify_fail( 'Shortcode [vintrica_vignette_form] returned empty output.' );
 	} elseif ( false === strpos( $shortcode_output, 'vintrica-vignette-form' ) ) {
 		vintrica_verify_fail( 'Shortcode output does not contain expected markup.' );
+	} elseif ( false === strpos( $shortcode_output, 'vintrica-step--billing' ) ) {
+		vintrica_verify_fail( 'Shortcode output does not contain billing step markup.' );
+	} elseif ( false === strpos( $shortcode_output, 'vintrica_billing_first_name' ) ) {
+		vintrica_verify_fail( 'Shortcode output does not contain billing form fields.' );
 	} else {
-		vintrica_verify_pass( 'Shortcode [vintrica_vignette_form] renders expected markup.' );
+		vintrica_verify_pass( 'Shortcode [vintrica_vignette_form] renders expected two-step checkout markup.' );
 	}
 }
 
@@ -554,6 +658,32 @@ if ( false !== stripos( $frontend_js, 'jQuery' ) || false !== stripos( $frontend
 	vintrica_verify_fail( 'frontend.js references jQuery.' );
 } else {
 	vintrica_verify_pass( 'frontend.js has no jQuery references.' );
+}
+
+if ( false !== stripos( $frontend_js, 'woocommerce' ) ) {
+	vintrica_verify_fail( 'frontend.js still references WooCommerce.' );
+} else {
+	vintrica_verify_pass( 'frontend.js has no WooCommerce references.' );
+}
+
+$plugin_sources = implode(
+	"\n",
+	array(
+		file_get_contents( $plugin_root . '/vintrica-vignette-form.php' ),
+		file_get_contents( $plugin_root . '/includes/class-vintrica-frontend.php' ),
+	)
+);
+
+if ( false !== stripos( $plugin_sources, 'woocommerce' ) || false !== stripos( $plugin_sources, 'WooCommerce' ) ) {
+	vintrica_verify_fail( 'Plugin source still references WooCommerce.' );
+} else {
+	vintrica_verify_pass( 'Plugin source has no WooCommerce references.' );
+}
+
+if ( ! class_exists( 'Vintrica_Orders' ) || ! class_exists( 'Vintrica_Checkout' ) || ! class_exists( 'Vintrica_Stripe' ) ) {
+	vintrica_verify_fail( 'Custom checkout classes are missing.' );
+} else {
+	vintrica_verify_pass( 'Custom checkout classes loaded.' );
 }
 
 echo PHP_EOL . 'VINTRICA build verification' . PHP_EOL;

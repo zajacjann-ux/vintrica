@@ -23,6 +23,11 @@ class Vintrica_Frontend {
 	const VIGNETTES_FIELD = 'vintrica_vignettes';
 
 	/**
+	 * Checkout submit field name.
+	 */
+	const CHECKOUT_SUBMIT_FIELD = 'vintrica_checkout_submit';
+
+	/**
 	 * Security handler instance.
 	 *
 	 * @var Vintrica_Security
@@ -37,14 +42,23 @@ class Vintrica_Frontend {
 	private $pricing;
 
 	/**
+	 * Checkout handler instance.
+	 *
+	 * @var Vintrica_Checkout
+	 */
+	private $checkout;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Vintrica_Security $security Security handler.
 	 * @param Vintrica_Pricing  $pricing  Pricing handler.
+	 * @param Vintrica_Checkout $checkout Checkout handler.
 	 */
-	public function __construct( Vintrica_Security $security, Vintrica_Pricing $pricing ) {
+	public function __construct( Vintrica_Security $security, Vintrica_Pricing $pricing, Vintrica_Checkout $checkout ) {
 		$this->security = $security;
 		$this->pricing  = $pricing;
+		$this->checkout = $checkout;
 
 		add_action( 'init', array( $this, 'register_shortcode' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
@@ -92,17 +106,13 @@ class Vintrica_Frontend {
 		wp_enqueue_style( 'vintrica-frontend' );
 		wp_enqueue_script( 'vintrica-frontend' );
 
-		$woocommerce = vintrica_vignette_form()->woocommerce;
-
 		wp_localize_script(
 			'vintrica-frontend',
 			'vintricaConfig',
 			array(
-				'storageKey'        => $storage_key,
-				'checkoutReady'     => $woocommerce->is_checkout_ready(),
-				'woocommerceActive' => $woocommerce->is_woocommerce_active(),
-				'config'            => $this->pricing->get_frontend_config(),
-				'strings'           => $this->get_js_strings(),
+				'storageKey' => $storage_key,
+				'config'     => $this->pricing->get_frontend_config(),
+				'strings'    => $this->get_js_strings(),
 			)
 		);
 	}
@@ -129,21 +139,27 @@ class Vintrica_Frontend {
 			'subtotal'                  => __( 'Medzisúčet', 'vintrica-vignette-form' ),
 			'serviceFee'                => __( 'Servisný poplatok', 'vintrica-vignette-form' ),
 			'total'                     => __( 'Celková suma', 'vintrica-vignette-form' ),
-			'validationRequired'          => __( 'Neplatné údaje.', 'vintrica-vignette-form' ),
+			'validationRequired'        => __( 'Neplatné údaje.', 'vintrica-vignette-form' ),
 			'validationOrderEmpty'      => __( 'Pridajte aspoň jednu známku.', 'vintrica-vignette-form' ),
 			'validationInvalidData'     => __( 'Neplatné údaje.', 'vintrica-vignette-form' ),
+			'validationBillingRequired' => __( 'Vyplňte všetky povinné fakturačné údaje.', 'vintrica-vignette-form' ),
+			'validationEmailInvalid'    => __( 'Zadajte platnú e-mailovú adresu.', 'vintrica-vignette-form' ),
+			'validationConsentRequired' => __( 'Musíte súhlasiť so všetkými povinnými podmienkami.', 'vintrica-vignette-form' ),
 			'vignetteAdded'             => __( 'Známka bola úspešne pridaná.', 'vintrica-vignette-form' ),
 			'vignetteUpdated'           => __( 'Známka bola úspešne upravená.', 'vintrica-vignette-form' ),
 			'vignetteRemoved'           => __( 'Známka bola odstránená.', 'vintrica-vignette-form' ),
-			'woocommerceMissing'        => __( 'WooCommerce nie je nainštalovaný alebo aktivovaný.', 'vintrica-vignette-form' ),
-			'woocommerceNotReady'       => __( 'Prepojenie s WooCommerce košíkom ešte nie je dostupné.', 'vintrica-vignette-form' ),
 			'plateLabel'                => __( 'ŠPZ', 'vintrica-vignette-form' ),
 			'startsLabel'               => __( 'Začiatok', 'vintrica-vignette-form' ),
+			'stepBuilder'               => __( 'Známky', 'vintrica-vignette-form' ),
+			'stepBilling'               => __( 'Fakturačné údaje', 'vintrica-vignette-form' ),
+			'backToBuilder'             => __( 'Späť na známky', 'vintrica-vignette-form' ),
+			'continueToBilling'         => __( 'Pokračovať k platbe', 'vintrica-vignette-form' ),
+			'submitOrder'               => __( 'Odoslať objednávku', 'vintrica-vignette-form' ),
 		);
 	}
 
 	/**
-	 * Handle form submission on template redirect.
+	 * Handle checkout form submission on template redirect.
 	 *
 	 * @return void
 	 */
@@ -152,48 +168,19 @@ class Vintrica_Frontend {
 			return;
 		}
 
-		if ( ! isset( $_POST['vintrica_vignette_submit'] ) ) {
+		if ( ! isset( $_POST[ self::CHECKOUT_SUBMIT_FIELD ] ) ) {
 			return;
 		}
 
-		if ( ! vintrica_vignette_form()->woocommerce->is_checkout_ready() ) {
-			return;
-		}
-
-		if ( ! $this->security->verify_form_request() ) {
-			$this->set_notice( 'error', __( 'Overenie bezpečnosti zlyhalo. Skúste to znova.', 'vintrica-vignette-form' ) );
-			return;
-		}
-
-		if ( ! isset( $_POST[ self::VIGNETTES_FIELD ] ) ) {
-			$this->set_notice( 'error', __( 'Nebola odoslaná žiadna objednávka známok.', 'vintrica-vignette-form' ) );
-			return;
-		}
-
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified above.
-		$raw_order = wp_unslash( $_POST[ self::VIGNETTES_FIELD ] );
-		$vignettes = $this->security->sanitize_vignette_order( $raw_order );
-
-		if ( is_wp_error( $vignettes ) ) {
-			$this->set_notice( 'error', $vignettes->get_error_message() );
-			return;
-		}
-
-		$totals = $this->pricing->calculate_totals( $vignettes );
-
-		$order_data = array(
-			'vignettes' => $vignettes,
-			'totals'    => $totals,
-		);
-
-		$result = vintrica_vignette_form()->woocommerce->process_order( $order_data );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified in checkout handler.
+		$result = $this->checkout->process_submission( wp_unslash( $_POST ) );
 
 		if ( is_wp_error( $result ) ) {
 			$this->set_notice( 'error', $result->get_error_message() );
 			return;
 		}
 
-		wp_safe_redirect( $result );
+		wp_safe_redirect( $result['redirect'] );
 		exit;
 	}
 
@@ -250,13 +237,27 @@ class Vintrica_Frontend {
 	}
 
 	/**
+	 * Get confirmed order number from query string.
+	 *
+	 * @return string
+	 */
+	private function get_confirmed_order_number() {
+		if ( ! isset( $_GET['vintrica_order'] ) ) {
+			return '';
+		}
+
+		return sanitize_text_field( wp_unslash( $_GET['vintrica_order'] ) );
+	}
+
+	/**
 	 * Render the vignette order form.
 	 *
 	 * @param array|string $atts Shortcode attributes.
 	 * @return string
 	 */
 	public function render_form( $atts = array() ) {
-		$storage_key = $this->get_storage_key();
+		$storage_key  = $this->get_storage_key();
+		$order_number = $this->get_confirmed_order_number();
 
 		$this->enqueue_assets( $storage_key );
 
@@ -269,119 +270,249 @@ class Vintrica_Frontend {
 		<div class="vintrica-vignette-form-wrapper" data-storage-key="<?php echo esc_attr( $storage_key ); ?>">
 			<?php $this->render_notices( $notices ); ?>
 
-			<form class="vintrica-vignette-form" method="post" action="<?php echo esc_url( get_permalink() ); ?>" novalidate>
-				<?php $this->security->render_nonce_field(); ?>
-
-				<input type="hidden" name="<?php echo esc_attr( self::VIGNETTES_FIELD ); ?>" id="vintrica-vignettes-data" value="" />
-
-				<div class="vintrica-builder">
-					<section class="vintrica-builder__panel vintrica-builder__panel--form" aria-labelledby="vintrica-builder-title">
-						<h2 id="vintrica-builder-title" class="vintrica-builder__title">
-							<?php echo esc_html__( 'Pridať známku', 'vintrica-vignette-form' ); ?>
-						</h2>
-
-						<div class="vintrica-builder__fields">
-							<div class="vintrica-field">
-								<label for="vintrica-country"><?php echo esc_html__( 'Krajina', 'vintrica-vignette-form' ); ?></label>
-								<select id="vintrica-country" data-vintrica-field="country">
-									<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-									<?php foreach ( $countries as $value => $label ) : ?>
-										<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</div>
-
-							<div class="vintrica-field">
-								<label for="vintrica-vehicle-type"><?php echo esc_html__( 'Typ vozidla', 'vintrica-vignette-form' ); ?></label>
-								<select id="vintrica-vehicle-type" data-vintrica-field="vehicle_type">
-									<option value=""><?php echo esc_html__( 'Vyberte typ vozidla', 'vintrica-vignette-form' ); ?></option>
-									<?php foreach ( $vehicle_types as $value => $label ) : ?>
-										<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</div>
-
-							<div class="vintrica-field">
-								<label for="vintrica-vignette-validity"><?php echo esc_html__( 'Platnosť známky', 'vintrica-vignette-form' ); ?></label>
-								<select id="vintrica-vignette-validity" data-vintrica-field="vignette_validity" disabled>
-									<option value=""><?php echo esc_html__( 'Najprv vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-								</select>
-							</div>
-
-							<div class="vintrica-field">
-								<label for="vintrica-start-date"><?php echo esc_html__( 'Dátum začiatku platnosti', 'vintrica-vignette-form' ); ?></label>
-								<input type="date" id="vintrica-start-date" data-vintrica-field="start_date" />
-							</div>
-
-							<div class="vintrica-field">
-								<label for="vintrica-license-plate"><?php echo esc_html__( 'ŠPZ', 'vintrica-vignette-form' ); ?></label>
-								<input type="text" id="vintrica-license-plate" data-vintrica-field="license_plate" maxlength="20" />
-							</div>
-
-							<div class="vintrica-field">
-								<label for="vintrica-registration-country"><?php echo esc_html__( 'Krajina registrácie vozidla', 'vintrica-vignette-form' ); ?></label>
-								<select id="vintrica-registration-country" data-vintrica-field="registration_country">
-									<option value=""><?php echo esc_html__( 'Vyberte krajinu registrácie vozidla', 'vintrica-vignette-form' ); ?></option>
-									<?php foreach ( $countries as $value => $label ) : ?>
-										<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</div>
-						</div>
-
-						<div class="vintrica-builder__actions">
-							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-cancel-edit" hidden>
-								<?php echo esc_html__( 'Zrušiť úpravu', 'vintrica-vignette-form' ); ?>
-							</button>
-							<button type="button" class="vintrica-button vintrica-button--primary vintrica-add-vignette">
-								<?php echo esc_html__( 'Pridať známku', 'vintrica-vignette-form' ); ?>
-							</button>
-						</div>
-
-						<div class="vintrica-form-success" role="status" hidden></div>
-						<div class="vintrica-form-error" role="alert" hidden></div>
-					</section>
-
-					<section class="vintrica-builder__panel vintrica-builder__panel--summary" aria-labelledby="vintrica-summary-title">
-						<h2 id="vintrica-summary-title" class="vintrica-builder__title">
-							<?php echo esc_html__( 'Vaša objednávka', 'vintrica-vignette-form' ); ?>
-						</h2>
-
-						<ul class="vintrica-summary-list" aria-live="polite"></ul>
-
-						<div class="vintrica-summary-empty">
-							<?php echo esc_html__( 'Zatiaľ nebola pridaná žiadna známka.', 'vintrica-vignette-form' ); ?>
-						</div>
-
-						<dl class="vintrica-summary-totals">
-							<div class="vintrica-summary-totals__row">
-								<dt><?php echo esc_html__( 'Počet známok', 'vintrica-vignette-form' ); ?></dt>
-								<dd class="vintrica-total-count">0</dd>
-							</div>
-							<div class="vintrica-summary-totals__row">
-								<dt><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></dt>
-								<dd class="vintrica-total-subtotal"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
-							</div>
-							<div class="vintrica-summary-totals__row">
-								<dt><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></dt>
-								<dd class="vintrica-total-service-fee"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
-							</div>
-							<div class="vintrica-summary-totals__row vintrica-summary-totals__row--total">
-								<dt><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></dt>
-								<dd class="vintrica-total-amount"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
-							</div>
-						</dl>
-					</section>
+			<?php if ( $order_number ) : ?>
+				<div class="vintrica-notice vintrica-notice--success" role="status">
+					<p>
+						<?php
+						printf(
+							/* translators: %s: order number */
+							esc_html__( 'Objednávka %s bola úspešne prijatá. Platba cez Stripe bude čoskoro dostupná.', 'vintrica-vignette-form' ),
+							esc_html( $order_number )
+						);
+						?>
+					</p>
 				</div>
+			<?php else : ?>
+				<form class="vintrica-vignette-form" method="post" action="<?php echo esc_url( get_permalink() ); ?>" novalidate>
+					<?php $this->security->render_nonce_field(); ?>
 
-				<div class="vintrica-continue-notice" role="status" hidden></div>
+					<input type="hidden" name="<?php echo esc_attr( self::VIGNETTES_FIELD ); ?>" id="vintrica-vignettes-data" value="" />
 
-				<div class="vintrica-field vintrica-field--submit">
-					<button type="submit" name="vintrica_vignette_submit" value="1" class="vintrica-submit" disabled>
-						<?php echo esc_html__( 'Pokračovať k platbe', 'vintrica-vignette-form' ); ?>
-					</button>
-				</div>
-			</form>
+					<ol class="vintrica-steps" aria-label="<?php echo esc_attr__( 'Kroky objednávky', 'vintrica-vignette-form' ); ?>">
+						<li class="vintrica-steps__item is-active" data-vintrica-step-indicator="1">
+							<span class="vintrica-steps__number">1</span>
+							<span class="vintrica-steps__label"><?php echo esc_html__( 'Známky', 'vintrica-vignette-form' ); ?></span>
+						</li>
+						<li class="vintrica-steps__item" data-vintrica-step-indicator="2">
+							<span class="vintrica-steps__number">2</span>
+							<span class="vintrica-steps__label"><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></span>
+						</li>
+					</ol>
+
+					<div class="vintrica-step vintrica-step--builder is-active" data-vintrica-step="1">
+						<div class="vintrica-builder">
+							<section class="vintrica-builder__panel vintrica-builder__panel--form" aria-labelledby="vintrica-builder-title">
+								<h2 id="vintrica-builder-title" class="vintrica-builder__title">
+									<?php echo esc_html__( 'Pridať známku', 'vintrica-vignette-form' ); ?>
+								</h2>
+
+								<div class="vintrica-builder__fields">
+									<div class="vintrica-field">
+										<label for="vintrica-country"><?php echo esc_html__( 'Krajina', 'vintrica-vignette-form' ); ?></label>
+										<select id="vintrica-country" data-vintrica-field="country">
+											<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
+											<?php foreach ( $countries as $value => $label ) : ?>
+												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</div>
+
+									<div class="vintrica-field">
+										<label for="vintrica-vehicle-type"><?php echo esc_html__( 'Typ vozidla', 'vintrica-vignette-form' ); ?></label>
+										<select id="vintrica-vehicle-type" data-vintrica-field="vehicle_type">
+											<option value=""><?php echo esc_html__( 'Vyberte typ vozidla', 'vintrica-vignette-form' ); ?></option>
+											<?php foreach ( $vehicle_types as $value => $label ) : ?>
+												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</div>
+
+									<div class="vintrica-field">
+										<label for="vintrica-vignette-validity"><?php echo esc_html__( 'Platnosť známky', 'vintrica-vignette-form' ); ?></label>
+										<select id="vintrica-vignette-validity" data-vintrica-field="vignette_validity" disabled>
+											<option value=""><?php echo esc_html__( 'Najprv vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
+										</select>
+									</div>
+
+									<div class="vintrica-field">
+										<label for="vintrica-start-date"><?php echo esc_html__( 'Dátum začiatku platnosti', 'vintrica-vignette-form' ); ?></label>
+										<input type="date" id="vintrica-start-date" data-vintrica-field="start_date" />
+									</div>
+
+									<div class="vintrica-field">
+										<label for="vintrica-license-plate"><?php echo esc_html__( 'ŠPZ', 'vintrica-vignette-form' ); ?></label>
+										<input type="text" id="vintrica-license-plate" data-vintrica-field="license_plate" maxlength="20" />
+									</div>
+
+									<div class="vintrica-field">
+										<label for="vintrica-registration-country"><?php echo esc_html__( 'Krajina registrácie vozidla', 'vintrica-vignette-form' ); ?></label>
+										<select id="vintrica-registration-country" data-vintrica-field="registration_country">
+											<option value=""><?php echo esc_html__( 'Vyberte krajinu registrácie vozidla', 'vintrica-vignette-form' ); ?></option>
+											<?php foreach ( $countries as $value => $label ) : ?>
+												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</div>
+								</div>
+
+								<div class="vintrica-builder__actions">
+									<button type="button" class="vintrica-button vintrica-button--secondary vintrica-cancel-edit" hidden>
+										<?php echo esc_html__( 'Zrušiť úpravu', 'vintrica-vignette-form' ); ?>
+									</button>
+									<button type="button" class="vintrica-button vintrica-button--primary vintrica-add-vignette">
+										<?php echo esc_html__( 'Pridať známku', 'vintrica-vignette-form' ); ?>
+									</button>
+								</div>
+
+								<div class="vintrica-form-success" role="status" hidden></div>
+								<div class="vintrica-form-error" role="alert" hidden></div>
+							</section>
+
+							<section class="vintrica-builder__panel vintrica-builder__panel--summary" aria-labelledby="vintrica-summary-title">
+								<h2 id="vintrica-summary-title" class="vintrica-builder__title">
+									<?php echo esc_html__( 'Vaša objednávka', 'vintrica-vignette-form' ); ?>
+								</h2>
+
+								<ul class="vintrica-summary-list" aria-live="polite"></ul>
+
+								<div class="vintrica-summary-empty">
+									<?php echo esc_html__( 'Zatiaľ nebola pridaná žiadna známka.', 'vintrica-vignette-form' ); ?>
+								</div>
+
+								<dl class="vintrica-summary-totals">
+									<div class="vintrica-summary-totals__row">
+										<dt><?php echo esc_html__( 'Počet známok', 'vintrica-vignette-form' ); ?></dt>
+										<dd class="vintrica-total-count">0</dd>
+									</div>
+									<div class="vintrica-summary-totals__row">
+										<dt><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></dt>
+										<dd class="vintrica-total-subtotal"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
+									</div>
+									<div class="vintrica-summary-totals__row">
+										<dt><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></dt>
+										<dd class="vintrica-total-service-fee"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
+									</div>
+									<div class="vintrica-summary-totals__row vintrica-summary-totals__row--total">
+										<dt><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></dt>
+										<dd class="vintrica-total-amount"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
+									</div>
+								</dl>
+							</section>
+						</div>
+
+						<div class="vintrica-field vintrica-field--submit">
+							<button type="button" class="vintrica-submit vintrica-continue-billing" disabled>
+								<?php echo esc_html__( 'Pokračovať k platbe', 'vintrica-vignette-form' ); ?>
+							</button>
+						</div>
+					</div>
+
+					<div class="vintrica-step vintrica-step--billing" data-vintrica-step="2" hidden>
+						<section class="vintrica-builder__panel" aria-labelledby="vintrica-billing-title">
+							<h2 id="vintrica-billing-title" class="vintrica-builder__title">
+								<?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?>
+							</h2>
+
+							<div class="vintrica-billing-fields">
+								<div class="vintrica-field">
+									<label for="vintrica-billing-first-name"><?php echo esc_html__( 'Meno', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="text" id="vintrica-billing-first-name" name="vintrica_billing_first_name" autocomplete="given-name" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-last-name"><?php echo esc_html__( 'Priezvisko', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="text" id="vintrica-billing-last-name" name="vintrica_billing_last_name" autocomplete="family-name" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-email"><?php echo esc_html__( 'E-mail', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="email" id="vintrica-billing-email" name="vintrica_billing_email" autocomplete="email" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-phone"><?php echo esc_html__( 'Telefón', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="tel" id="vintrica-billing-phone" name="vintrica_billing_phone" autocomplete="tel" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-company"><?php echo esc_html__( 'Firma', 'vintrica-vignette-form' ); ?></label>
+									<input type="text" id="vintrica-billing-company" name="vintrica_billing_company" autocomplete="organization" />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-ico"><?php echo esc_html__( 'IČO', 'vintrica-vignette-form' ); ?></label>
+									<input type="text" id="vintrica-billing-ico" name="vintrica_billing_ico" />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-dic"><?php echo esc_html__( 'DIČ', 'vintrica-vignette-form' ); ?></label>
+									<input type="text" id="vintrica-billing-dic" name="vintrica_billing_dic" />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-ic-dph"><?php echo esc_html__( 'IČ DPH', 'vintrica-vignette-form' ); ?></label>
+									<input type="text" id="vintrica-billing-ic-dph" name="vintrica_billing_ic_dph" />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-street"><?php echo esc_html__( 'Ulica', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="text" id="vintrica-billing-street" name="vintrica_billing_street" autocomplete="street-address" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-city"><?php echo esc_html__( 'Mesto', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="text" id="vintrica-billing-city" name="vintrica_billing_city" autocomplete="address-level2" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-zip"><?php echo esc_html__( 'PSČ', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<input type="text" id="vintrica-billing-zip" name="vintrica_billing_zip" autocomplete="postal-code" required />
+								</div>
+
+								<div class="vintrica-field">
+									<label for="vintrica-billing-country"><?php echo esc_html__( 'Krajina', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
+									<select id="vintrica-billing-country" name="vintrica_billing_country" autocomplete="country" required>
+										<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
+										<?php foreach ( $countries as $value => $label ) : ?>
+											<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</div>
+							</div>
+
+							<fieldset class="vintrica-consents">
+								<legend><?php echo esc_html__( 'Súhlasy', 'vintrica-vignette-form' ); ?></legend>
+
+								<label class="vintrica-checkbox">
+									<input type="checkbox" name="vintrica_consent_terms" value="1" required />
+									<span><?php echo esc_html__( 'Súhlasím s obchodnými podmienkami', 'vintrica-vignette-form' ); ?></span>
+								</label>
+
+								<label class="vintrica-checkbox">
+									<input type="checkbox" name="vintrica_consent_privacy" value="1" required />
+									<span><?php echo esc_html__( 'Súhlasím so spracovaním osobných údajov', 'vintrica-vignette-form' ); ?></span>
+								</label>
+
+								<label class="vintrica-checkbox">
+									<input type="checkbox" name="vintrica_consent_service_start" value="1" required />
+									<span><?php echo esc_html__( 'Súhlasím so začatím poskytovania služby pred uplynutím lehoty na odstúpenie od zmluvy', 'vintrica-vignette-form' ); ?></span>
+								</label>
+							</fieldset>
+
+							<div class="vintrica-billing-error vintrica-form-error" role="alert" hidden></div>
+						</section>
+
+						<div class="vintrica-billing-actions">
+							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-back-builder">
+								<?php echo esc_html__( 'Späť na známky', 'vintrica-vignette-form' ); ?>
+							</button>
+							<button type="submit" name="<?php echo esc_attr( self::CHECKOUT_SUBMIT_FIELD ); ?>" value="1" class="vintrica-submit vintrica-submit-order">
+								<?php echo esc_html__( 'Odoslať objednávku', 'vintrica-vignette-form' ); ?>
+							</button>
+						</div>
+					</div>
+				</form>
+			<?php endif; ?>
 		</div>
 		<?php
 		return ob_get_clean();

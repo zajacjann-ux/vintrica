@@ -36,11 +36,11 @@ class Vintrica_Activator {
 			update_option( 'vintrica_vignette_form_version', VINTRICA_VERSION );
 		}
 
-		flush_rewrite_rules();
-
-		if ( class_exists( 'WooCommerce' ) && function_exists( 'vintrica_vignette_form' ) ) {
-			vintrica_vignette_form()->woocommerce->setup_product();
+		if ( function_exists( 'vintrica_vignette_form' ) ) {
+			vintrica_vignette_form()->orders->create_table();
 		}
+
+		flush_rewrite_rules();
 	}
 
 	/**

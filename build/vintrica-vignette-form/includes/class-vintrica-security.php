@@ -85,6 +85,122 @@ class Vintrica_Security {
 	}
 
 	/**
+	 * Verify form request from a POST array.
+	 *
+	 * @param array $post_data POST data.
+	 * @return bool
+	 */
+	public function verify_form_request_from_post( array $post_data ) {
+		if ( ! isset( $post_data[ self::FORM_NONCE_NAME ] ) ) {
+			return false;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $post_data[ self::FORM_NONCE_NAME ] ) );
+
+		if ( ! wp_verify_nonce( $nonce, self::FORM_NONCE_ACTION ) ) {
+			return false;
+		}
+
+		return $this->verify_referrer();
+	}
+
+	/**
+	 * Sanitize billing form data.
+	 *
+	 * @param array $post_data Raw POST data.
+	 * @return array<string, string|bool>|WP_Error
+	 */
+	public function sanitize_billing_data( array $post_data ) {
+		$required_fields = array(
+			'first_name',
+			'last_name',
+			'email',
+			'phone',
+			'street',
+			'city',
+			'zip',
+			'country',
+		);
+
+		$optional_fields = array(
+			'company',
+			'ico',
+			'dic',
+			'ic_dph',
+		);
+
+		$billing = array();
+
+		foreach ( $required_fields as $field ) {
+			if ( empty( $post_data[ 'vintrica_billing_' . $field ] ) ) {
+				return new WP_Error(
+					'vintrica_billing_required',
+					__( 'Vyplňte všetky povinné fakturačné údaje.', 'vintrica-vignette-form' )
+				);
+			}
+		}
+
+		foreach ( array_merge( $required_fields, $optional_fields ) as $field ) {
+			$key = 'vintrica_billing_' . $field;
+			$value = isset( $post_data[ $key ] ) ? wp_unslash( $post_data[ $key ] ) : '';
+
+			switch ( $field ) {
+				case 'email':
+					$billing[ $field ] = sanitize_email( $value );
+					if ( ! is_email( $billing[ $field ] ) ) {
+						return new WP_Error(
+							'vintrica_invalid_email',
+							__( 'Zadajte platnú e-mailovú adresu.', 'vintrica-vignette-form' )
+						);
+					}
+					break;
+
+				case 'phone':
+					$billing[ $field ] = preg_replace( '/[^0-9+\-\s()]/', '', sanitize_text_field( $value ) );
+					break;
+
+				case 'country':
+					$billing[ $field ] = sanitize_key( $value );
+					if ( ! isset( $this->pricing->get_countries()[ $billing[ $field ] ] ) ) {
+						return new WP_Error(
+							'vintrica_invalid_billing_country',
+							__( 'Neplatná fakturačná krajina.', 'vintrica-vignette-form' )
+						);
+					}
+					break;
+
+				case 'ico':
+				case 'dic':
+				case 'ic_dph':
+					$billing[ $field ] = preg_replace( '/[^A-Za-z0-9]/', '', sanitize_text_field( $value ) );
+					break;
+
+				default:
+					$billing[ $field ] = sanitize_text_field( $value );
+					break;
+			}
+		}
+
+		$required_checkboxes = array(
+			'terms'          => __( 'Súhlas s obchodnými podmienkami je povinný.', 'vintrica-vignette-form' ),
+			'privacy'        => __( 'Súhlas so spracovaním osobných údajov je povinný.', 'vintrica-vignette-form' ),
+			'service_start'  => __( 'Súhlas so začatím poskytovania služby je povinný.', 'vintrica-vignette-form' ),
+		);
+
+		foreach ( $required_checkboxes as $checkbox => $message ) {
+			$key = 'vintrica_consent_' . $checkbox;
+
+			if ( empty( $post_data[ $key ] ) ) {
+				return new WP_Error( 'vintrica_missing_consent', $message );
+			}
+
+			$billing[ 'consent_' . $checkbox ] = true;
+		}
+
+		return $billing;
+	}
+
+	/**
 	 * Verify HTTP referer for CSRF protection.
 	 *
 	 * @return bool

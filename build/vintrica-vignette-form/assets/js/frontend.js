@@ -7,8 +7,6 @@
 
 	var config = window.vintricaConfig.config;
 	var strings = window.vintricaConfig.strings;
-	var checkoutReady = !!window.vintricaConfig.checkoutReady;
-	var woocommerceActive = !!window.vintricaConfig.woocommerceActive;
 	var storageKey = window.vintricaConfig.storageKey || 'vintrica_vignettes_default';
 
 	function formatPrice(amount) {
@@ -63,11 +61,16 @@
 		return 0;
 	}
 
+	function isValidEmail(value) {
+		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+	}
+
 	function VintricaBuilder(form) {
 		this.form = form;
 		this.vignettes = [];
 		this.editingIndex = null;
 		this.storageKey = storageKey;
+		this.currentStep = 1;
 
 		this.fields = {
 			country: form.querySelector('[data-vintrica-field="country"]'),
@@ -81,16 +84,34 @@
 		this.hiddenInput = form.querySelector('#vintrica-vignettes-data');
 		this.summaryList = form.querySelector('.vintrica-summary-list');
 		this.summaryEmpty = form.querySelector('.vintrica-summary-empty');
-		this.formError = form.querySelector('.vintrica-form-error');
+		this.formError = form.querySelector('.vintrica-step--builder .vintrica-form-error');
 		this.formSuccess = form.querySelector('.vintrica-form-success');
-		this.continueNotice = form.querySelector('.vintrica-continue-notice');
 		this.addButton = form.querySelector('.vintrica-add-vignette');
 		this.cancelButton = form.querySelector('.vintrica-cancel-edit');
-		this.submitButton = form.querySelector('.vintrica-submit');
+		this.continueButton = form.querySelector('.vintrica-continue-billing');
+		this.backButton = form.querySelector('.vintrica-back-builder');
+		this.submitButton = form.querySelector('.vintrica-submit-order');
+		this.billingError = form.querySelector('.vintrica-billing-error');
+		this.stepBuilder = form.querySelector('.vintrica-step--builder');
+		this.stepBilling = form.querySelector('.vintrica-step--billing');
+		this.stepIndicators = form.querySelectorAll('[data-vintrica-step-indicator]');
 		this.totalCount = form.querySelector('.vintrica-total-count');
 		this.totalSubtotal = form.querySelector('.vintrica-total-subtotal');
 		this.totalServiceFee = form.querySelector('.vintrica-total-service-fee');
 		this.totalAmount = form.querySelector('.vintrica-total-amount');
+
+		this.billingFields = {
+			first_name: form.querySelector('[name="vintrica_billing_first_name"]'),
+			last_name: form.querySelector('[name="vintrica_billing_last_name"]'),
+			email: form.querySelector('[name="vintrica_billing_email"]'),
+			phone: form.querySelector('[name="vintrica_billing_phone"]'),
+			street: form.querySelector('[name="vintrica_billing_street"]'),
+			city: form.querySelector('[name="vintrica_billing_city"]'),
+			zip: form.querySelector('[name="vintrica_billing_zip"]'),
+			country: form.querySelector('[name="vintrica_billing_country"]')
+		};
+
+		this.consentFields = form.querySelectorAll('[name^="vintrica_consent_"]');
 
 		this.bindEvents();
 		this.loadFromStorage();
@@ -125,39 +146,69 @@
 			self.cancelEdit();
 		});
 
+		this.continueButton.addEventListener('click', function () {
+			self.goToStep(2);
+		});
+
+		this.backButton.addEventListener('click', function () {
+			self.goToStep(1);
+		});
+
 		this.form.addEventListener('submit', function (event) {
-			var validation = self.validateContinue();
+			var validation;
+
+			if (self.currentStep !== 2) {
+				event.preventDefault();
+				return;
+			}
+
+			validation = self.validateCheckout();
 
 			if (!validation.valid) {
 				event.preventDefault();
-				self.clearContinueNotice();
-				self.showFormError(validation.message);
+				self.showBillingError(validation.message);
 				return;
 			}
 
-			if (!checkoutReady) {
-				event.preventDefault();
-				self.clearFormError();
-				self.persistState();
-				self.showContinueNotice(
-					woocommerceActive ? strings.woocommerceNotReady : strings.woocommerceMissing
-				);
-				return;
-			}
-
-			self.clearContinueNotice();
-			self.clearFormError();
+			self.clearBillingError();
 			self.persistState();
 			self.clearStorage();
-
-			if (!self.prepareSubmit()) {
-				event.preventDefault();
-				return;
-			}
-
 			self.submitButton.disabled = true;
 			self.submitButton.setAttribute('aria-busy', 'true');
 		});
+	};
+
+	VintricaBuilder.prototype.goToStep = function (step) {
+		var validation;
+
+		if (step === 2) {
+			validation = this.validateContinue();
+
+			if (!validation.valid) {
+				this.showFormError(validation.message);
+				return;
+			}
+
+			this.clearFormError();
+			this.persistState();
+		}
+
+		this.currentStep = step;
+		this.stepBuilder.hidden = step !== 1;
+		this.stepBuilder.classList.toggle('is-active', step === 1);
+		this.stepBilling.hidden = step !== 2;
+		this.stepBilling.classList.toggle('is-active', step === 2);
+
+		this.stepIndicators.forEach(function (indicator) {
+			var indicatorStep = parseInt(indicator.getAttribute('data-vintrica-step-indicator'), 10);
+			indicator.classList.toggle('is-active', indicatorStep === step);
+			indicator.classList.toggle('is-complete', indicatorStep < step);
+		});
+
+		if (step === 2) {
+			this.clearBillingError();
+			this.stepBilling.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
 	};
 
 	VintricaBuilder.prototype.loadFromStorage = function () {
@@ -268,6 +319,16 @@
 		this.formError.hidden = true;
 	};
 
+	VintricaBuilder.prototype.showBillingError = function (message) {
+		this.billingError.textContent = message;
+		this.billingError.hidden = false;
+	};
+
+	VintricaBuilder.prototype.clearBillingError = function () {
+		this.billingError.textContent = '';
+		this.billingError.hidden = true;
+	};
+
 	VintricaBuilder.prototype.showFormSuccess = function (message) {
 		this.formSuccess.textContent = message;
 		this.formSuccess.hidden = false;
@@ -277,16 +338,6 @@
 	VintricaBuilder.prototype.clearFormSuccess = function () {
 		this.formSuccess.textContent = '';
 		this.formSuccess.hidden = true;
-	};
-
-	VintricaBuilder.prototype.showContinueNotice = function (message) {
-		this.continueNotice.textContent = message;
-		this.continueNotice.hidden = false;
-	};
-
-	VintricaBuilder.prototype.clearContinueNotice = function () {
-		this.continueNotice.textContent = '';
-		this.continueNotice.hidden = true;
 	};
 
 	VintricaBuilder.prototype.validateBuilderFields = function (values) {
@@ -341,12 +392,56 @@
 		};
 	};
 
+	VintricaBuilder.prototype.validateCheckout = function () {
+		var continueValidation = this.validateContinue();
+		var fieldKey;
+		var field;
+		var i;
+
+		if (!continueValidation.valid) {
+			return continueValidation;
+		}
+
+		for (fieldKey in this.billingFields) {
+			if (Object.prototype.hasOwnProperty.call(this.billingFields, fieldKey)) {
+				field = this.billingFields[fieldKey];
+
+				if (!field || !String(field.value).trim()) {
+					return {
+						valid: false,
+						message: strings.validationBillingRequired
+					};
+				}
+			}
+		}
+
+		if (!isValidEmail(this.billingFields.email.value.trim())) {
+			return {
+				valid: false,
+				message: strings.validationEmailInvalid
+			};
+		}
+
+		for (i = 0; i < this.consentFields.length; i += 1) {
+			if (!this.consentFields[i].checked) {
+				return {
+					valid: false,
+					message: strings.validationConsentRequired
+				};
+			}
+		}
+
+		return {
+			valid: true,
+			message: ''
+		};
+	};
+
 	VintricaBuilder.prototype.handleAddOrUpdate = function () {
 		var values = this.getFieldValues();
 		var wasEditing = this.editingIndex !== null;
 
 		this.clearFormError();
-		this.clearContinueNotice();
 
 		if (!this.validateBuilderFields(values)) {
 			this.showFormError(strings.validationRequired);
@@ -372,7 +467,6 @@
 		this.addButton.textContent = strings.updateVignette;
 		this.cancelButton.hidden = false;
 		this.clearFormError();
-		this.clearContinueNotice();
 	};
 
 	VintricaBuilder.prototype.cancelEdit = function () {
@@ -491,21 +585,9 @@
 		this.totalSubtotal.textContent = formatPrice(totals.subtotal);
 		this.totalServiceFee.textContent = formatPrice(totals.serviceFee);
 		this.totalAmount.textContent = formatPrice(totals.total);
-		this.submitButton.disabled = this.vignettes.length === 0;
+		this.continueButton.disabled = this.vignettes.length === 0;
 
 		this.persistState();
-	};
-
-	VintricaBuilder.prototype.prepareSubmit = function () {
-		this.clearFormError();
-
-		if (this.vignettes.length === 0) {
-			this.showFormError(strings.validationOrderEmpty);
-			return false;
-		}
-
-		this.persistState();
-		return true;
 	};
 
 	document.addEventListener('DOMContentLoaded', function () {

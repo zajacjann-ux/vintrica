@@ -1,0 +1,248 @@
+<?php
+/**
+ * Custom VINTRICA orders database handler.
+ *
+ * @package Vintrica_Vignette_Form
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Class Vintrica_Orders
+ */
+class Vintrica_Orders {
+
+	/**
+	 * Database version for schema upgrades.
+	 */
+	const DB_VERSION = '1.0.0';
+
+	/**
+	 * Option key for stored DB version.
+	 */
+	const DB_VERSION_OPTION = 'vintrica_orders_db_version';
+
+	/**
+	 * Get orders table name.
+	 *
+	 * @return string
+	 */
+	public function get_table_name() {
+		global $wpdb;
+
+		return $wpdb->prefix . 'vintrica_orders';
+	}
+
+	/**
+	 * Create or upgrade the orders table.
+	 *
+	 * @return void
+	 */
+	public function create_table() {
+		global $wpdb;
+
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		$table_name      = $this->get_table_name();
+		$charset_collate = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table_name} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			order_number varchar(32) NOT NULL,
+			status varchar(32) NOT NULL DEFAULT 'pending_payment',
+			vignettes longtext NOT NULL,
+			billing longtext NOT NULL,
+			subtotal decimal(10,2) NOT NULL DEFAULT 0.00,
+			service_fee decimal(10,2) NOT NULL DEFAULT 0.00,
+			total decimal(10,2) NOT NULL DEFAULT 0.00,
+			currency varchar(8) NOT NULL DEFAULT 'EUR',
+			stripe_session_id varchar(255) DEFAULT NULL,
+			stripe_session_payload longtext DEFAULT NULL,
+			ip_address varchar(45) DEFAULT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY order_number (order_number),
+			KEY status (status),
+			KEY created_at (created_at)
+		) {$charset_collate};";
+
+		dbDelta( $sql );
+
+		update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
+	}
+
+	/**
+	 * Insert a new order.
+	 *
+	 * @param array $order_data Prepared order data.
+	 * @return int|WP_Error Order ID or error.
+	 */
+	public function create_order( array $order_data ) {
+		global $wpdb;
+
+		$order_number = $this->generate_order_number();
+
+		if ( is_wp_error( $order_number ) ) {
+			return $order_number;
+		}
+
+		$inserted = $wpdb->insert(
+			$this->get_table_name(),
+			array(
+				'order_number'           => $order_number,
+				'status'                 => sanitize_key( $order_data['status'] ?? 'pending_payment' ),
+				'vignettes'              => wp_json_encode( $order_data['vignettes'] ),
+				'billing'                => wp_json_encode( $order_data['billing'] ),
+				'subtotal'               => (float) $order_data['totals']['subtotal'],
+				'service_fee'            => (float) $order_data['totals']['service_fee'],
+				'total'                  => (float) $order_data['totals']['total'],
+				'currency'               => sanitize_text_field( $order_data['currency'] ?? 'EUR' ),
+				'stripe_session_id'      => isset( $order_data['stripe_session_id'] ) ? sanitize_text_field( $order_data['stripe_session_id'] ) : null,
+				'stripe_session_payload' => isset( $order_data['stripe_session_payload'] ) ? wp_json_encode( $order_data['stripe_session_payload'] ) : null,
+				'ip_address'             => isset( $order_data['ip_address'] ) ? sanitize_text_field( $order_data['ip_address'] ) : '',
+				'created_at'             => current_time( 'mysql', true ),
+			),
+			array(
+				'%s',
+				'%s',
+				'%s',
+				'%s',
+				'%f',
+				'%f',
+				'%f',
+				'%s',
+				'%s',
+				'%s',
+				'%s',
+				'%s',
+			)
+		);
+
+		if ( false === $inserted ) {
+			return new WP_Error(
+				'vintrica_order_insert_failed',
+				__( 'Objednávku sa nepodarilo uložiť.', 'vintrica-vignette-form' )
+			);
+		}
+
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Get order by ID.
+	 *
+	 * @param int $order_id Order ID.
+	 * @return object|null
+	 */
+	public function get_order( $order_id ) {
+		global $wpdb;
+
+		$table_name = $this->get_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table_name} WHERE id = %d",
+				(int) $order_id
+			)
+		);
+	}
+
+	/**
+	 * Get order by order number.
+	 *
+	 * @param string $order_number Order number.
+	 * @return object|null
+	 */
+	public function get_order_by_number( $order_number ) {
+		global $wpdb;
+
+		$table_name = $this->get_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table_name} WHERE order_number = %s",
+				sanitize_text_field( $order_number )
+			)
+		);
+	}
+
+	/**
+	 * Update Stripe session metadata on an order.
+	 *
+	 * @param int    $order_id   Order ID.
+	 * @param string $session_id Stripe session ID.
+	 * @param array  $payload    Prepared Stripe payload.
+	 * @return bool
+	 */
+	public function update_stripe_session( $order_id, $session_id, array $payload ) {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return false !== $wpdb->update(
+			$this->get_table_name(),
+			array(
+				'stripe_session_id'      => sanitize_text_field( $session_id ),
+				'stripe_session_payload' => wp_json_encode( $payload ),
+			),
+			array( 'id' => (int) $order_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Get recent orders for admin list.
+	 *
+	 * @param int $limit Result limit.
+	 * @return array<int, object>
+	 */
+	public function get_recent_orders( $limit = 20 ) {
+		global $wpdb;
+
+		$table_name = $this->get_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table_name} ORDER BY created_at DESC LIMIT %d",
+				(int) $limit
+			)
+		);
+
+		return is_array( $results ) ? $results : array();
+	}
+
+	/**
+	 * Generate a unique order number.
+	 *
+	 * @return string|WP_Error
+	 */
+	private function generate_order_number() {
+		global $wpdb;
+
+		$table_name = $this->get_table_name();
+
+		for ( $attempt = 0; $attempt < 5; $attempt++ ) {
+			$order_number = 'VIN-' . gmdate( 'Ymd' ) . '-' . strtoupper( wp_generate_password( 6, false, false ) );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$table_name} WHERE order_number = %s",
+					$order_number
+				)
+			);
+
+			if ( empty( $exists ) ) {
+				return $order_number;
+			}
+		}
+
+		return new WP_Error(
+			'vintrica_order_number_failed',
+			__( 'Nepodarilo sa vygenerovať číslo objednávky.', 'vintrica-vignette-form' )
+		);
+	}
+}

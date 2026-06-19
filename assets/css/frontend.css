@@ -286,3 +286,113 @@
 .vintrica-notice p {
 	margin: 0;
 }
+
+.vintrica-steps {
+	display: flex;
+	gap: 1rem;
+	margin: 0 0 1.5rem;
+	padding: 0;
+	list-style: none;
+}
+
+.vintrica-steps__item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex: 1;
+	padding: 0.75rem 1rem;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	background: #f6f7f7;
+	color: #646970;
+}
+
+.vintrica-steps__item.is-active {
+	border-color: #2271b1;
+	background: #eef6fc;
+	color: #1d2327;
+	font-weight: 600;
+}
+
+.vintrica-steps__item.is-complete {
+	border-color: #68de7c;
+	background: #edfaef;
+	color: #1e4620;
+}
+
+.vintrica-steps__number {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 50%;
+	background: #fff;
+	border: 1px solid currentColor;
+	font-weight: 700;
+	font-size: 0.875rem;
+}
+
+.vintrica-step[hidden] {
+	display: none;
+}
+
+.vintrica-billing-fields {
+	display: grid;
+	gap: 1rem;
+}
+
+@media (min-width: 768px) {
+	.vintrica-billing-fields {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.vintrica-billing-fields .vintrica-field:nth-child(9),
+	.vintrica-billing-fields .vintrica-field:nth-child(10),
+	.vintrica-billing-fields .vintrica-field:nth-child(11),
+	.vintrica-billing-fields .vintrica-field:nth-child(12) {
+		grid-column: span 1;
+	}
+}
+
+.vintrica-required {
+	color: #b32d2e;
+}
+
+.vintrica-consents {
+	display: grid;
+	gap: 0.75rem;
+	margin: 1.25rem 0 0;
+	padding: 1rem;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+}
+
+.vintrica-consents legend {
+	padding: 0 0.25rem;
+	font-weight: 600;
+}
+
+.vintrica-checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.625rem;
+	cursor: pointer;
+}
+
+.vintrica-checkbox input {
+	margin-top: 0.2rem;
+	flex-shrink: 0;
+}
+
+.vintrica-billing-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-top: 1.25rem;
+}
+
+.vintrica-billing-actions .vintrica-submit {
+	flex: 1;
+	min-width: 12rem;
+}
