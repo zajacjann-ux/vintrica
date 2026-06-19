@@ -98,10 +98,11 @@ class Vintrica_Frontend {
 			'vintrica-frontend',
 			'vintricaConfig',
 			array(
-				'storageKey'    => $storage_key,
-				'checkoutReady' => $woocommerce->is_checkout_ready(),
-				'config'        => $this->pricing->get_frontend_config(),
-				'strings'       => $this->get_js_strings(),
+				'storageKey'        => $storage_key,
+				'checkoutReady'     => $woocommerce->is_checkout_ready(),
+				'woocommerceActive' => $woocommerce->is_woocommerce_active(),
+				'config'            => $this->pricing->get_frontend_config(),
+				'strings'           => $this->get_js_strings(),
 			)
 		);
 	}
@@ -134,7 +135,8 @@ class Vintrica_Frontend {
 			'vignetteAdded'             => __( 'Známka bola úspešne pridaná.', 'vintrica-vignette-form' ),
 			'vignetteUpdated'           => __( 'Známka bola úspešne upravená.', 'vintrica-vignette-form' ),
 			'vignetteRemoved'           => __( 'Známka bola odstránená.', 'vintrica-vignette-form' ),
-			'woocommerceNotReady'       => __( 'Prepojenie s WooCommerce košíkom ešte nie je implementované.', 'vintrica-vignette-form' ),
+			'woocommerceMissing'        => __( 'WooCommerce nie je nainštalovaný alebo aktivovaný.', 'vintrica-vignette-form' ),
+			'woocommerceNotReady'       => __( 'Prepojenie s WooCommerce košíkom ešte nie je dostupné.', 'vintrica-vignette-form' ),
 			'plateLabel'                => __( 'ŠPZ', 'vintrica-vignette-form' ),
 			'startsLabel'               => __( 'Začiatok', 'vintrica-vignette-form' ),
 		);
@@ -184,26 +186,15 @@ class Vintrica_Frontend {
 			'totals'    => $totals,
 		);
 
-		/**
-		 * Fires after the vignette order is validated and priced server-side.
-		 *
-		 * @param array $order_data Validated order with vignettes and totals.
-		 */
-		do_action( 'vintrica_vignette_form_submitted', $order_data );
+		$result = vintrica_vignette_form()->woocommerce->process_order( $order_data );
 
-		$this->set_notice(
-			'success',
-			sprintf(
-				/* translators: %d: number of vignettes */
-				_n(
-					'Vaša objednávka s %d známkou bola prijatá.',
-					'Vaša objednávka s %d známkami bola prijatá.',
-					$totals['count'],
-					'vintrica-vignette-form'
-				),
-				(int) $totals['count']
-			)
-		);
+		if ( is_wp_error( $result ) ) {
+			$this->set_notice( 'error', $result->get_error_message() );
+			return;
+		}
+
+		wp_safe_redirect( $result );
+		exit;
 	}
 
 	/**

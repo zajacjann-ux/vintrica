@@ -8,6 +8,7 @@
 	var config = window.vintricaConfig.config;
 	var strings = window.vintricaConfig.strings;
 	var checkoutReady = !!window.vintricaConfig.checkoutReady;
+	var woocommerceActive = !!window.vintricaConfig.woocommerceActive;
 	var storageKey = window.vintricaConfig.storageKey || 'vintrica_vignettes_default';
 
 	function formatPrice(amount) {
@@ -96,6 +97,18 @@
 		this.renderSummary();
 	}
 
+	VintricaBuilder.prototype.clearStorage = function () {
+		if (!window.localStorage) {
+			return;
+		}
+
+		try {
+			window.localStorage.removeItem(this.storageKey);
+		} catch (error) {
+			// Ignore storage errors.
+		}
+	};
+
 	VintricaBuilder.prototype.bindEvents = function () {
 		var self = this;
 
@@ -126,9 +139,16 @@
 				event.preventDefault();
 				self.clearFormError();
 				self.persistState();
-				self.showContinueNotice(strings.woocommerceNotReady);
+				self.showContinueNotice(
+					woocommerceActive ? strings.woocommerceNotReady : strings.woocommerceMissing
+				);
 				return;
 			}
+
+			self.clearContinueNotice();
+			self.clearFormError();
+			self.persistState();
+			self.clearStorage();
 
 			if (!self.prepareSubmit()) {
 				event.preventDefault();

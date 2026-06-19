@@ -39,7 +39,7 @@ class Vintrica_Activator {
 		flush_rewrite_rules();
 
 		if ( class_exists( 'WooCommerce' ) && function_exists( 'vintrica_vignette_form' ) ) {
-			vintrica_vignette_form()->woocommerce->ensure_product_exists();
+			vintrica_vignette_form()->woocommerce->setup_product();
 		}
 	}
 

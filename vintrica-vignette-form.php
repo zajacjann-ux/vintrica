@@ -3,7 +3,7 @@
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok pre WooCommerce.
- * Version:           1.0.1
+ * Version:           1.0.2
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -20,7 +20,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.0.1' );
+define( 'VINTRICA_VERSION', '1.0.2' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

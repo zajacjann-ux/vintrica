@@ -18,6 +18,21 @@ class Vintrica_WooCommerce {
 	const PRODUCT_OPTION = 'vintrica_wc_product_id';
 
 	/**
+	 * Option key for the last product setup error message.
+	 */
+	const PRODUCT_ERROR_OPTION = 'vintrica_wc_product_error';
+
+	/**
+	 * Base product SKU.
+	 */
+	const PRODUCT_SKU = 'vintrica-vignette-base';
+
+	/**
+	 * Legacy SKU used by earlier plugin versions.
+	 */
+	const LEGACY_PRODUCT_SKU = 'vintrica-vignette';
+
+	/**
 	 * Cart item data flag.
 	 */
 	const CART_ITEM_FLAG = 'vintrica_vignette';
@@ -35,6 +50,7 @@ class Vintrica_WooCommerce {
 	public function __construct() {
 		add_action( 'plugins_loaded', array( $this, 'maybe_bootstrap' ), 20 );
 		add_action( 'admin_notices', array( $this, 'render_missing_woocommerce_notice' ) );
+		add_action( 'admin_notices', array( $this, 'render_product_admin_notices' ) );
 	}
 
 	/**
@@ -49,7 +65,6 @@ class Vintrica_WooCommerce {
 
 		$this->pricing = vintrica_vignette_form()->pricing;
 		$this->register_hooks();
-		$this->ensure_product_exists();
 	}
 
 	/**
@@ -505,7 +520,7 @@ class Vintrica_WooCommerce {
 	}
 
 	/**
-	 * Get or create the base vignette product ID.
+	 * Get the base vignette product ID without creating products.
 	 *
 	 * @return int
 	 */
@@ -516,16 +531,42 @@ class Vintrica_WooCommerce {
 			return $product_id;
 		}
 
+		return $this->find_product_id_by_sku();
+	}
+
+	/**
+	 * Create or resolve the base vignette product during activation or admin setup.
+	 *
+	 * @return int Product ID on success, 0 on failure.
+	 */
+	public function setup_product() {
 		return $this->create_product();
 	}
 
 	/**
-	 * Ensure the base product exists.
+	 * Find an existing product by the configured SKU.
 	 *
-	 * @return void
+	 * @return int
 	 */
-	public function ensure_product_exists() {
-		$this->get_product_id();
+	private function find_product_id_by_sku() {
+		if ( ! function_exists( 'wc_get_product_id_by_sku' ) ) {
+			return 0;
+		}
+
+		$skus = array( self::PRODUCT_SKU, self::LEGACY_PRODUCT_SKU );
+
+		foreach ( $skus as $sku ) {
+			$product_id = (int) wc_get_product_id_by_sku( $sku );
+
+			if ( $product_id > 0 && wc_get_product( $product_id ) ) {
+				update_option( self::PRODUCT_OPTION, $product_id );
+				$this->clear_product_error();
+
+				return $product_id;
+			}
+		}
+
+		return 0;
 	}
 
 	/**
@@ -535,26 +576,89 @@ class Vintrica_WooCommerce {
 	 */
 	public function create_product() {
 		if ( ! class_exists( 'WC_Product_Simple' ) ) {
+			$this->set_product_error(
+				__( 'WooCommerce produktový typ nie je dostupný.', 'vintrica-vignette-form' )
+			);
+
 			return 0;
 		}
 
-		$product = new WC_Product_Simple();
-		$product->set_name( __( 'Diaľničná známka', 'vintrica-vignette-form' ) );
-		$product->set_status( 'publish' );
-		$product->set_catalog_visibility( 'hidden' );
-		$product->set_virtual( true );
-		$product->set_sold_individually( false );
-		$product->set_price( 0 );
-		$product->set_regular_price( 0 );
-		$product->set_sku( 'vintrica-vignette' );
+		$existing_id = $this->find_product_id_by_sku();
 
-		$product_id = $product->save();
-
-		if ( $product_id ) {
-			update_option( self::PRODUCT_OPTION, $product_id );
+		if ( $existing_id > 0 ) {
+			return $existing_id;
 		}
 
-		return (int) $product_id;
+		$stored_id = (int) get_option( self::PRODUCT_OPTION, 0 );
+
+		if ( $stored_id > 0 && wc_get_product( $stored_id ) ) {
+			$this->clear_product_error();
+
+			return $stored_id;
+		}
+
+		try {
+			$product = new WC_Product_Simple();
+			$product->set_name( __( 'Diaľničná známka', 'vintrica-vignette-form' ) );
+			$product->set_status( 'publish' );
+			$product->set_catalog_visibility( 'hidden' );
+			$product->set_virtual( true );
+			$product->set_sold_individually( false );
+			$product->set_price( 0 );
+			$product->set_regular_price( 0 );
+			$product->set_sku( self::PRODUCT_SKU );
+
+			$product_id = (int) $product->save();
+
+			if ( $product_id <= 0 ) {
+				throw new Exception(
+					__( 'Produkt diaľničnej známky sa nepodarilo uložiť.', 'vintrica-vignette-form' )
+				);
+			}
+
+			update_option( self::PRODUCT_OPTION, $product_id );
+			$this->clear_product_error();
+
+			return $product_id;
+		} catch ( Exception $exception ) {
+			$duplicate_id = $this->find_product_id_by_sku();
+
+			if ( $duplicate_id > 0 ) {
+				return $duplicate_id;
+			}
+
+			$this->set_product_error( $exception->getMessage() );
+
+			return 0;
+		}
+	}
+
+	/**
+	 * Store the latest product setup error for admin display.
+	 *
+	 * @param string $message Error message.
+	 * @return void
+	 */
+	private function set_product_error( $message ) {
+		update_option( self::PRODUCT_ERROR_OPTION, sanitize_text_field( $message ) );
+	}
+
+	/**
+	 * Clear stored product setup errors.
+	 *
+	 * @return void
+	 */
+	private function clear_product_error() {
+		delete_option( self::PRODUCT_ERROR_OPTION );
+	}
+
+	/**
+	 * Get the last product setup error message.
+	 *
+	 * @return string
+	 */
+	public function get_product_error() {
+		return (string) get_option( self::PRODUCT_ERROR_OPTION, '' );
 	}
 
 	/**
@@ -574,6 +678,43 @@ class Vintrica_WooCommerce {
 		printf(
 			'<div class="notice notice-warning is-dismissible"><p>%s</p></div>',
 			esc_html__( 'Plugin VINTRICA Vignette Form vyžaduje WooCommerce na spracovanie objednávok známok. Nainštalujte a aktivujte WooCommerce.', 'vintrica-vignette-form' )
+		);
+	}
+
+	/**
+	 * Show admin notices related to the base vignette product setup.
+	 *
+	 * @return void
+	 */
+	public function render_product_admin_notices() {
+		if ( ! current_user_can( 'manage_options' ) || ! $this->is_woocommerce_active() ) {
+			return;
+		}
+
+		$error = $this->get_product_error();
+
+		if ( $error ) {
+			printf(
+				'<div class="notice notice-error is-dismissible"><p><strong>%s</strong> %s</p></div>',
+				esc_html__( 'VINTRICA FORM:', 'vintrica-vignette-form' ),
+				esc_html( $error )
+			);
+		}
+
+		if ( $this->get_product_id() > 0 ) {
+			return;
+		}
+
+		$setup_url = wp_nonce_url(
+			admin_url( 'admin.php?page=' . Vintrica_Admin::MENU_SLUG . '&vintrica_setup_product=1' ),
+			'vintrica_setup_product'
+		);
+
+		printf(
+			'<div class="notice notice-warning is-dismissible"><p>%s <a href="%s">%s</a></p></div>',
+			esc_html__( 'Základný WooCommerce produkt pre diaľničné známky nie je pripravený.', 'vintrica-vignette-form' ),
+			esc_url( $setup_url ),
+			esc_html__( 'Vytvoriť produkt', 'vintrica-vignette-form' )
 		);
 	}
 
