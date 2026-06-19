@@ -53,7 +53,7 @@ class Vintrica_Activator {
 				esc_html(
 					sprintf(
 						/* translators: %s: required PHP version */
-						__( 'VINTRICA Vignette Form requires PHP %s or higher.', 'vintrica-vignette-form' ),
+						__( 'Plugin VINTRICA Vignette Form vyžaduje PHP %s alebo novšie.', 'vintrica-vignette-form' ),
 						self::MIN_PHP_VERSION
 					)
 				)
@@ -66,7 +66,7 @@ class Vintrica_Activator {
 				esc_html(
 					sprintf(
 						/* translators: %s: required WordPress version */
-						__( 'VINTRICA Vignette Form requires WordPress %s or higher.', 'vintrica-vignette-form' ),
+						__( 'Plugin VINTRICA Vignette Form vyžaduje WordPress %s alebo novší.', 'vintrica-vignette-form' ),
 						self::MIN_WP_VERSION
 					)
 				)

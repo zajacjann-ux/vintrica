@@ -239,6 +239,32 @@
 	display: none;
 }
 
+.vintrica-form-success {
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid #68de7c;
+	border-radius: 4px;
+	background: #edfaef;
+	color: #1e4620;
+}
+
+.vintrica-form-success[hidden] {
+	display: none;
+}
+
+.vintrica-continue-notice {
+	margin-top: 0.5rem;
+	padding: 0.875rem 1rem;
+	border: 1px solid #72aee6;
+	border-radius: 4px;
+	background: #eef6fc;
+	color: #1d3f5f;
+}
+
+.vintrica-continue-notice[hidden] {
+	display: none;
+}
+
 .vintrica-notice {
 	padding: 0.875rem 1rem;
 	margin-bottom: 1rem;

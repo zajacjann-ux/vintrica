@@ -42,6 +42,24 @@ class Vintrica_WooCommerce {
 	}
 
 	/**
+	 * Check whether cart checkout integration is ready for form submission.
+	 *
+	 * @return bool
+	 */
+	public function is_checkout_ready() {
+		if ( ! $this->is_woocommerce_active() ) {
+			return false;
+		}
+
+		/**
+		 * Filter whether WooCommerce cart checkout integration is ready.
+		 *
+		 * @param bool $ready Whether checkout handoff is implemented.
+		 */
+		return (bool) apply_filters( 'vintrica_is_checkout_ready', false );
+	}
+
+	/**
 	 * Register WooCommerce integration hooks.
 	 *
 	 * @return void

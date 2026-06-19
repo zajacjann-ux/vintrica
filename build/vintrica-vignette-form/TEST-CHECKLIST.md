@@ -1,11 +1,11 @@
 # VINTRICA Vignette Form — Production Test Checklist
 
-Use this checklist after installing `vintrica-vignette-form-1.0.0.zip` on a staging WordPress site.
+Use this checklist after installing `vintrica-vignette-form-1.0.1.zip` on a staging WordPress site.
 
 ## Installation
 
 - [ ] Upload and activate the plugin without PHP warnings or fatal errors
-- [ ] Confirm **Plugins → VINTRICA Vignette Form** shows version **1.0.0**
+- [ ] Confirm **Plugins → VINTRICA Vignette Form** shows version **1.0.1**
 - [ ] Confirm **VINTRICA FORM** appears in the admin menu
 - [ ] Open the admin page and verify the shortcode `[vintrica_vignette_form]` is displayed
 
@@ -62,5 +62,5 @@ bash bin/build.sh
 Expected result:
 
 - All verification checks pass
-- ZIP created at `dist/vintrica-vignette-form-1.0.0.zip`
+- ZIP created at `dist/vintrica-vignette-form-1.0.1.zip`
 - ZIP root folder is `vintrica-vignette-form/`

@@ -48,17 +48,17 @@ class Vintrica_Admin {
 	 */
 	public function render_admin_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'vintrica-vignette-form' ) );
+			wp_die( esc_html__( 'Nemáte oprávnenie na prístup k tejto stránke.', 'vintrica-vignette-form' ) );
 		}
 
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'VINTRICA FORM', 'vintrica-vignette-form' ); ?></h1>
-			<p><?php echo esc_html__( 'Configure the vignette order form and display it using the shortcode below.', 'vintrica-vignette-form' ); ?></p>
+			<p><?php echo esc_html__( 'Nastavte objednávkový formulár diaľničných známok a zobrazte ho pomocou shortcode nižšie.', 'vintrica-vignette-form' ); ?></p>
 			<p>
 				<code>[vintrica_vignette_form]</code>
 			</p>
-			<p><?php echo esc_html__( 'WooCommerce integration settings will be available in a future release.', 'vintrica-vignette-form' ); ?></p>
+			<p><?php echo esc_html__( 'Nastavenia prepojenia s WooCommerce budú dostupné v budúcej verzii.', 'vintrica-vignette-form' ); ?></p>
 		</div>
 		<?php
 	}
