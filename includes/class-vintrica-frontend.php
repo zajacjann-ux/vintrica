@@ -80,16 +80,31 @@ class Vintrica_Frontend {
 	 */
 	public function register_assets() {
 		wp_register_style(
+			'vintrica-choices',
+			VINTRICA_PLUGIN_URL . 'assets/vendor/choices.min.css',
+			array(),
+			'10.2.0'
+		);
+
+		wp_register_style(
 			'vintrica-frontend',
 			VINTRICA_PLUGIN_URL . 'assets/css/frontend.css',
-			array(),
+			array( 'vintrica-choices' ),
 			VINTRICA_VERSION
+		);
+
+		wp_register_script(
+			'vintrica-choices',
+			VINTRICA_PLUGIN_URL . 'assets/vendor/choices.min.js',
+			array(),
+			'10.2.0',
+			true
 		);
 
 		wp_register_script(
 			'vintrica-frontend',
 			VINTRICA_PLUGIN_URL . 'assets/js/frontend.js',
-			array(),
+			array( 'vintrica-choices' ),
 			VINTRICA_VERSION,
 			true
 		);
@@ -102,7 +117,9 @@ class Vintrica_Frontend {
 	 * @return void
 	 */
 	private function enqueue_assets( $storage_key ) {
+		wp_enqueue_style( 'vintrica-choices' );
 		wp_enqueue_style( 'vintrica-frontend' );
+		wp_enqueue_script( 'vintrica-choices' );
 		wp_enqueue_script( 'vintrica-frontend' );
 
 		wp_localize_script(
@@ -190,6 +207,9 @@ class Vintrica_Frontend {
 			'labelIcDph'                => __( 'IČ DPH', 'vintrica-vignette-form' ),
 			'paymentProcessing'         => __( 'Presmerovávam na platbu...', 'vintrica-vignette-form' ),
 			'paymentFailed'             => __( 'Platbu sa nepodarilo spustiť. Skúste to prosím znova.', 'vintrica-vignette-form' ),
+			'searchPlaceholder'         => __( 'Hľadať…', 'vintrica-vignette-form' ),
+			'noResults'                 => __( 'Nenašli sa žiadne výsledky', 'vintrica-vignette-form' ),
+			'noChoices'                 => __( 'Žiadne možnosti', 'vintrica-vignette-form' ),
 		);
 	}
 
@@ -277,6 +297,33 @@ class Vintrica_Frontend {
 	}
 
 	/**
+	 * Render an inline SVG icon for form fields.
+	 *
+	 * @param string $icon Icon key.
+	 * @return string
+	 */
+	private function render_field_icon( $icon ) {
+		$svg_attrs = 'width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
+
+		switch ( $icon ) {
+			case 'globe':
+				return '<svg ' . $svg_attrs . '><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+			case 'vehicle':
+				return '<svg ' . $svg_attrs . '><path d="M7 17h-.5a2.5 2.5 0 0 1 0-5h.9l1.2-3.6A2 2 0 0 1 10.5 7h3a2 2 0 0 1 1.9 1.4l1.2 3.6h.9a2.5 2.5 0 0 1 0 5H17"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>';
+			case 'validity':
+				return '<svg ' . $svg_attrs . '><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>';
+			case 'plate':
+				return '<svg ' . $svg_attrs . '><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h4M18 10h.01"/></svg>';
+			case 'registration':
+				return '<svg ' . $svg_attrs . '><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+			case 'calendar':
+				return '<svg ' . $svg_attrs . '><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+			default:
+				return '';
+		}
+	}
+
+	/**
 	 * Render the vignette order form.
 	 *
 	 * @param array|string $atts Shortcode attributes.
@@ -360,51 +407,69 @@ class Vintrica_Frontend {
 								</h2>
 
 								<div class="vintrica-builder__fields">
-									<div class="vintrica-field">
+									<div class="vintrica-field vintrica-field--has-icon">
 										<label for="vintrica-country"><?php echo esc_html__( 'Krajina', 'vintrica-vignette-form' ); ?></label>
-										<select id="vintrica-country" data-vintrica-field="country">
-											<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-											<?php foreach ( $countries as $value => $label ) : ?>
-												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-											<?php endforeach; ?>
-										</select>
+										<div class="vintrica-control">
+											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'globe' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+											<select id="vintrica-country" class="vintrica-choices-select" data-vintrica-field="country">
+												<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
+												<?php foreach ( $countries as $value => $label ) : ?>
+													<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										</div>
 									</div>
 
-									<div class="vintrica-field">
+									<div class="vintrica-field vintrica-field--has-icon">
 										<label for="vintrica-vehicle-type"><?php echo esc_html__( 'Typ vozidla', 'vintrica-vignette-form' ); ?></label>
-										<select id="vintrica-vehicle-type" data-vintrica-field="vehicle_type">
-											<option value=""><?php echo esc_html__( 'Vyberte typ vozidla', 'vintrica-vignette-form' ); ?></option>
-											<?php foreach ( $vehicle_types as $value => $label ) : ?>
-												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-											<?php endforeach; ?>
-										</select>
+										<div class="vintrica-control">
+											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'vehicle' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+											<select id="vintrica-vehicle-type" class="vintrica-choices-select" data-vintrica-field="vehicle_type">
+												<option value=""><?php echo esc_html__( 'Vyberte typ vozidla', 'vintrica-vignette-form' ); ?></option>
+												<?php foreach ( $vehicle_types as $value => $label ) : ?>
+													<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										</div>
 									</div>
 
-									<div class="vintrica-field">
+									<div class="vintrica-field vintrica-field--has-icon">
 										<label for="vintrica-vignette-validity"><?php echo esc_html__( 'Platnosť známky', 'vintrica-vignette-form' ); ?></label>
-										<select id="vintrica-vignette-validity" data-vintrica-field="vignette_validity" disabled>
-											<option value=""><?php echo esc_html__( 'Najprv vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-										</select>
+										<div class="vintrica-control">
+											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'validity' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+											<select id="vintrica-vignette-validity" class="vintrica-choices-select" data-vintrica-field="vignette_validity" disabled>
+												<option value=""><?php echo esc_html__( 'Najprv vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
+											</select>
+										</div>
 									</div>
 
-									<div class="vintrica-field">
+									<div class="vintrica-field vintrica-field--has-icon">
 										<label for="vintrica-start-date"><?php echo esc_html__( 'Dátum začiatku platnosti', 'vintrica-vignette-form' ); ?></label>
-										<input type="date" id="vintrica-start-date" data-vintrica-field="start_date" />
+										<div class="vintrica-control">
+											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'calendar' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+											<input type="date" id="vintrica-start-date" data-vintrica-field="start_date" />
+										</div>
 									</div>
 
-									<div class="vintrica-field">
+									<div class="vintrica-field vintrica-field--has-icon">
 										<label for="vintrica-license-plate"><?php echo esc_html__( 'ŠPZ', 'vintrica-vignette-form' ); ?></label>
-										<input type="text" id="vintrica-license-plate" data-vintrica-field="license_plate" maxlength="20" />
+										<div class="vintrica-control">
+											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'plate' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+											<input type="text" id="vintrica-license-plate" data-vintrica-field="license_plate" maxlength="20" autocomplete="off" />
+										</div>
 									</div>
 
-									<div class="vintrica-field">
+									<div class="vintrica-field vintrica-field--has-icon">
 										<label for="vintrica-registration-country"><?php echo esc_html__( 'Krajina registrácie vozidla', 'vintrica-vignette-form' ); ?></label>
-										<select id="vintrica-registration-country" data-vintrica-field="registration_country">
-											<option value=""><?php echo esc_html__( 'Vyberte krajinu registrácie vozidla', 'vintrica-vignette-form' ); ?></option>
-											<?php foreach ( $countries as $value => $label ) : ?>
-												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-											<?php endforeach; ?>
-										</select>
+										<div class="vintrica-control">
+											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'registration' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+											<select id="vintrica-registration-country" class="vintrica-choices-select" data-vintrica-field="registration_country">
+												<option value=""><?php echo esc_html__( 'Vyberte krajinu registrácie vozidla', 'vintrica-vignette-form' ); ?></option>
+												<?php foreach ( $countries as $value => $label ) : ?>
+													<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										</div>
 									</div>
 								</div>
 
@@ -522,14 +587,17 @@ class Vintrica_Frontend {
 									<input type="text" id="vintrica-billing-zip" name="vintrica_billing_zip" autocomplete="postal-code" required />
 								</div>
 
-								<div class="vintrica-field">
+								<div class="vintrica-field vintrica-field--has-icon">
 									<label for="vintrica-billing-country"><?php echo esc_html__( 'Krajina', 'vintrica-vignette-form' ); ?> <span class="vintrica-required">*</span></label>
-									<select id="vintrica-billing-country" name="vintrica_billing_country" autocomplete="country" required>
-										<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-										<?php foreach ( $countries as $value => $label ) : ?>
-											<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-										<?php endforeach; ?>
-									</select>
+									<div class="vintrica-control">
+										<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'globe' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+										<select id="vintrica-billing-country" class="vintrica-choices-select" name="vintrica_billing_country" autocomplete="country" required>
+											<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
+											<?php foreach ( $countries as $value => $label ) : ?>
+												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</div>
 								</div>
 							</div>
 
