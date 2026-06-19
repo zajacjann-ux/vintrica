@@ -15,7 +15,7 @@ class Vintrica_Orders {
 	/**
 	 * Database version for schema upgrades.
 	 */
-	const DB_VERSION = '1.2.0';
+	const DB_VERSION = '1.3.0';
 
 	/**
 	 * Option key for stored DB version.
@@ -118,6 +118,7 @@ class Vintrica_Orders {
 			stripe_session_id varchar(255) DEFAULT NULL,
 			stripe_session_payload longtext DEFAULT NULL,
 			stripe_payment_intent_id varchar(255) DEFAULT NULL,
+			redirect_token varchar(64) DEFAULT NULL,
 			ip_address varchar(45) DEFAULT NULL,
 			created_at datetime NOT NULL,
 			paid_at datetime DEFAULT NULL,
@@ -149,6 +150,7 @@ class Vintrica_Orders {
 		}
 
 		$status = $this->normalize_status( $order_data['status'] ?? self::STATUS_UNPAID );
+		$redirect_token = $this->generate_redirect_token();
 
 		$inserted = $wpdb->insert(
 			$this->get_table_name(),
@@ -163,6 +165,7 @@ class Vintrica_Orders {
 				'currency'               => sanitize_text_field( $order_data['currency'] ?? 'EUR' ),
 				'stripe_session_id'      => isset( $order_data['stripe_session_id'] ) ? sanitize_text_field( $order_data['stripe_session_id'] ) : null,
 				'stripe_session_payload' => isset( $order_data['stripe_session_payload'] ) ? wp_json_encode( $order_data['stripe_session_payload'] ) : null,
+				'redirect_token'         => $redirect_token,
 				'ip_address'             => isset( $order_data['ip_address'] ) ? sanitize_text_field( $order_data['ip_address'] ) : '',
 				'created_at'             => current_time( 'mysql', true ),
 			),
@@ -174,6 +177,7 @@ class Vintrica_Orders {
 				'%f',
 				'%f',
 				'%f',
+				'%s',
 				'%s',
 				'%s',
 				'%s',
@@ -338,6 +342,65 @@ class Vintrica_Orders {
 			array( '%s', '%s' ),
 			array( '%d' )
 		);
+	}
+
+	/**
+	 * Generate a unique redirect token for an order.
+	 *
+	 * @return string
+	 */
+	public function generate_redirect_token() {
+		return wp_generate_password( 32, false, false );
+	}
+
+	/**
+	 * Ensure an order has a redirect token and return it.
+	 *
+	 * @param int $order_id Order ID.
+	 * @return string
+	 */
+	public function ensure_redirect_token( $order_id ) {
+		global $wpdb;
+
+		$order = $this->get_order( $order_id );
+
+		if ( ! $order ) {
+			return '';
+		}
+
+		if ( ! empty( $order->redirect_token ) ) {
+			return (string) $order->redirect_token;
+		}
+
+		$token = $this->generate_redirect_token();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->update(
+			$this->get_table_name(),
+			array( 'redirect_token' => $token ),
+			array( 'id' => (int) $order_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return $token;
+	}
+
+	/**
+	 * Verify a redirect token for an order.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param string $token    Redirect token from query string.
+	 * @return bool
+	 */
+	public function verify_redirect_token( $order_id, $token ) {
+		$order = $this->get_order( $order_id );
+
+		if ( ! $order || empty( $order->redirect_token ) || '' === trim( (string) $token ) ) {
+			return false;
+		}
+
+		return hash_equals( (string) $order->redirect_token, sanitize_text_field( $token ) );
 	}
 
 	/**

@@ -147,14 +147,21 @@ class Vintrica_Admin {
 			return;
 		}
 
-		vintrica_vignette_form()->stripe->save_settings(
+		$result = vintrica_vignette_form()->stripe->save_settings(
 			array(
-				'secret_key'      => isset( $_POST['vintrica_stripe_secret_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_secret_key'] ) ) : '',
-				'publishable_key' => isset( $_POST['vintrica_stripe_publishable_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_publishable_key'] ) ) : '',
-				'webhook_secret'  => isset( $_POST['vintrica_stripe_webhook_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_webhook_secret'] ) ) : '',
-				'test_mode'       => ! empty( $_POST['vintrica_stripe_test_mode'] ),
+				'secret_key'            => isset( $_POST['vintrica_stripe_secret_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_secret_key'] ) ) : '',
+				'publishable_key'       => isset( $_POST['vintrica_stripe_publishable_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_publishable_key'] ) ) : '',
+				'webhook_secret'        => isset( $_POST['vintrica_stripe_webhook_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_webhook_secret'] ) ) : '',
+				'test_mode'             => ! empty( $_POST['vintrica_stripe_test_mode'] ),
+				'success_redirect_url'  => isset( $_POST['vintrica_stripe_success_redirect_url'] ) ? wp_unslash( $_POST['vintrica_stripe_success_redirect_url'] ) : '',
+				'cancel_redirect_url'   => isset( $_POST['vintrica_stripe_cancel_redirect_url'] ) ? wp_unslash( $_POST['vintrica_stripe_cancel_redirect_url'] ) : '',
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_save_failed', $result->get_error_message(), 'error' );
+			return;
+		}
 
 		add_settings_error( 'vintrica_stripe', 'vintrica_stripe_saved', __( 'Nastavenia Stripe boli uložené.', 'vintrica-vignette-form' ), 'updated' );
 
@@ -531,11 +538,19 @@ class Vintrica_Admin {
 							<td><code><?php echo esc_html( $diagnostics['key_prefix'] ); ?></code></td>
 						</tr>
 						<tr>
-							<th><?php echo esc_html__( 'Success URL', 'vintrica-vignette-form' ); ?></th>
+							<th><?php echo esc_html__( 'Základná success URL', 'vintrica-vignette-form' ); ?></th>
+							<td><a href="<?php echo esc_url( $diagnostics['success_redirect_base_url'] ); ?>"><?php echo esc_html( $diagnostics['success_redirect_base_url'] ); ?></a></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Základná cancel URL', 'vintrica-vignette-form' ); ?></th>
+							<td><a href="<?php echo esc_url( $diagnostics['cancel_redirect_base_url'] ); ?>"><?php echo esc_html( $diagnostics['cancel_redirect_base_url'] ); ?></a></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Success URL (ukážka)', 'vintrica-vignette-form' ); ?></th>
 							<td><code><?php echo esc_html( $diagnostics['success_url'] ); ?></code></td>
 						</tr>
 						<tr>
-							<th><?php echo esc_html__( 'Cancel URL', 'vintrica-vignette-form' ); ?></th>
+							<th><?php echo esc_html__( 'Cancel URL (ukážka)', 'vintrica-vignette-form' ); ?></th>
 							<td><code><?php echo esc_html( $diagnostics['cancel_url'] ); ?></code></td>
 						</tr>
 					</tbody>
@@ -570,6 +585,22 @@ class Vintrica_Admin {
 								<input type="checkbox" name="vintrica_stripe_test_mode" value="1" <?php checked( $stripe->is_test_mode() ); ?> />
 								<?php echo esc_html__( 'Použiť testovacie Stripe kľúče', 'vintrica-vignette-form' ); ?>
 							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="vintrica-stripe-success-redirect-url"><?php echo esc_html__( 'URL ďakovnej stránky po úspešnej platbe', 'vintrica-vignette-form' ); ?></label></th>
+						<td>
+							<input type="url" class="regular-text code" id="vintrica-stripe-success-redirect-url" name="vintrica_stripe_success_redirect_url" value="<?php echo esc_attr( $stripe->get_configured_success_redirect_url() ); ?>" placeholder="<?php echo esc_attr( home_url( '/dakujeme/' ) ); ?>" />
+							<p class="description"><?php echo esc_html__( 'Sem vložte URL stránky, kam bude zákazník presmerovaný po úspešnej platbe.', 'vintrica-vignette-form' ); ?></p>
+							<p class="description"><?php echo esc_html__( 'Ak necháte prázdne, použije sa predvolená adresa /dakujeme/.', 'vintrica-vignette-form' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="vintrica-stripe-cancel-redirect-url"><?php echo esc_html__( 'URL stránky po neúspešnej alebo zrušenej platbe', 'vintrica-vignette-form' ); ?></label></th>
+						<td>
+							<input type="url" class="regular-text code" id="vintrica-stripe-cancel-redirect-url" name="vintrica_stripe_cancel_redirect_url" value="<?php echo esc_attr( $stripe->get_configured_cancel_redirect_url() ); ?>" placeholder="<?php echo esc_attr( home_url( '/platba-neuspesna/' ) ); ?>" />
+							<p class="description"><?php echo esc_html__( 'Sem vložte URL stránky, kam bude zákazník presmerovaný po zrušenej alebo neúspešnej platbe.', 'vintrica-vignette-form' ); ?></p>
+							<p class="description"><?php echo esc_html__( 'Ak necháte prázdne, použije sa predvolená adresa /platba-neuspesna/.', 'vintrica-vignette-form' ); ?></p>
 						</td>
 					</tr>
 				</table>

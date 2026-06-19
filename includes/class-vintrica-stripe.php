@@ -33,6 +33,16 @@ class Vintrica_Stripe {
 	const OPTION_TEST_MODE = 'vintrica_stripe_test_mode';
 
 	/**
+	 * Option key for success redirect URL.
+	 */
+	const OPTION_SUCCESS_REDIRECT_URL = 'vintrica_stripe_success_redirect_url';
+
+	/**
+	 * Option key for cancel redirect URL.
+	 */
+	const OPTION_CANCEL_REDIRECT_URL = 'vintrica_stripe_cancel_redirect_url';
+
+	/**
 	 * Stripe Checkout product name.
 	 */
 	const CHECKOUT_PRODUCT_NAME = 'Diaľničné známky VINTRICA';
@@ -71,6 +81,84 @@ class Vintrica_Stripe {
 	 */
 	public function is_test_mode() {
 		return (bool) get_option( self::OPTION_TEST_MODE, true );
+	}
+
+	/**
+	 * Get configured success redirect URL (empty when fallback is used).
+	 *
+	 * @return string
+	 */
+	public function get_configured_success_redirect_url() {
+		return (string) get_option( self::OPTION_SUCCESS_REDIRECT_URL, '' );
+	}
+
+	/**
+	 * Get configured cancel redirect URL (empty when fallback is used).
+	 *
+	 * @return string
+	 */
+	public function get_configured_cancel_redirect_url() {
+		return (string) get_option( self::OPTION_CANCEL_REDIRECT_URL, '' );
+	}
+
+	/**
+	 * Get base success redirect URL with fallback.
+	 *
+	 * @return string
+	 */
+	public function get_success_redirect_base_url() {
+		$url = esc_url_raw( trim( $this->get_configured_success_redirect_url() ) );
+
+		if ( '' === $url ) {
+			return home_url( '/dakujeme/' );
+		}
+
+		return $url;
+	}
+
+	/**
+	 * Get base cancel redirect URL with fallback.
+	 *
+	 * @return string
+	 */
+	public function get_cancel_redirect_base_url() {
+		$url = esc_url_raw( trim( $this->get_configured_cancel_redirect_url() ) );
+
+		if ( '' === $url ) {
+			return home_url( '/platba-neuspesna/' );
+		}
+
+		return $url;
+	}
+
+	/**
+	 * Sanitize and validate a redirect URL setting.
+	 *
+	 * @param string $url         Raw URL.
+	 * @param string $field_label Admin field label for errors.
+	 * @return string|WP_Error Sanitized URL or empty string.
+	 */
+	public function sanitize_redirect_url_setting( $url, $field_label ) {
+		$url = trim( (string) $url );
+
+		if ( '' === $url ) {
+			return '';
+		}
+
+		$sanitized = esc_url_raw( $url );
+
+		if ( '' === $sanitized || ! wp_http_validate_url( $sanitized ) ) {
+			return new WP_Error(
+				'vintrica_invalid_redirect_url',
+				sprintf(
+					/* translators: %s: admin field label */
+					__( '%s musí byť platná URL adresa.', 'vintrica-vignette-form' ),
+					$field_label
+				)
+			);
+		}
+
+		return $sanitized;
 	}
 
 	/**
@@ -174,16 +262,18 @@ class Vintrica_Stripe {
 	 * @param string $sample_order_number Sample order number for URL preview.
 	 * @return array<string, mixed>
 	 */
-	public function get_diagnostics( $sample_order_number = 'VIN-DEMO-0001' ) {
+	public function get_diagnostics( $sample_order_id = 123, $sample_token = 'abc' ) {
 		return array(
-			'test_mode'            => $this->is_test_mode(),
-			'has_secret_key'       => '' !== trim( $this->get_secret_key() ),
-			'has_publishable_key'  => '' !== trim( $this->get_publishable_key() ),
-			'has_webhook_secret'   => '' !== trim( $this->get_webhook_secret() ),
-			'key_prefix'           => $this->get_secret_key_prefix(),
-			'success_url'          => $this->get_success_url( $sample_order_number ),
-			'cancel_url'           => $this->get_cancel_url( $sample_order_number ),
-			'key_warning'          => $this->get_key_mode_warning(),
+			'test_mode'                 => $this->is_test_mode(),
+			'has_secret_key'            => '' !== trim( $this->get_secret_key() ),
+			'has_publishable_key'       => '' !== trim( $this->get_publishable_key() ),
+			'has_webhook_secret'        => '' !== trim( $this->get_webhook_secret() ),
+			'key_prefix'                => $this->get_secret_key_prefix(),
+			'success_redirect_base_url' => $this->get_success_redirect_base_url(),
+			'cancel_redirect_base_url'  => $this->get_cancel_redirect_base_url(),
+			'success_url'               => $this->get_success_url( $sample_order_id, $sample_token ),
+			'cancel_url'                => $this->get_cancel_url( $sample_order_id, $sample_token ),
+			'key_warning'               => $this->get_key_mode_warning(),
 		);
 	}
 
@@ -254,13 +344,35 @@ class Vintrica_Stripe {
 	 * Save Stripe settings.
 	 *
 	 * @param array $settings Settings payload.
-	 * @return void
+	 * @return true|WP_Error
 	 */
 	public function save_settings( array $settings ) {
+		$success_redirect_url = $this->sanitize_redirect_url_setting(
+			$settings['success_redirect_url'] ?? '',
+			__( 'URL ďakovnej stránky po úspešnej platbe', 'vintrica-vignette-form' )
+		);
+
+		if ( is_wp_error( $success_redirect_url ) ) {
+			return $success_redirect_url;
+		}
+
+		$cancel_redirect_url = $this->sanitize_redirect_url_setting(
+			$settings['cancel_redirect_url'] ?? '',
+			__( 'URL stránky po neúspešnej alebo zrušenej platbe', 'vintrica-vignette-form' )
+		);
+
+		if ( is_wp_error( $cancel_redirect_url ) ) {
+			return $cancel_redirect_url;
+		}
+
 		update_option( self::OPTION_SECRET_KEY, sanitize_text_field( $settings['secret_key'] ?? '' ) );
 		update_option( self::OPTION_PUBLISHABLE_KEY, sanitize_text_field( $settings['publishable_key'] ?? '' ) );
 		update_option( self::OPTION_WEBHOOK_SECRET, sanitize_text_field( $settings['webhook_secret'] ?? '' ) );
 		update_option( self::OPTION_TEST_MODE, ! empty( $settings['test_mode'] ) ? 1 : 0 );
+		update_option( self::OPTION_SUCCESS_REDIRECT_URL, $success_redirect_url );
+		update_option( self::OPTION_CANCEL_REDIRECT_URL, $cancel_redirect_url );
+
+		return true;
 	}
 
 	/**
@@ -523,6 +635,8 @@ class Vintrica_Stripe {
 		$billing  = json_decode( (string) $order->billing, true );
 		$email    = is_array( $billing ) && ! empty( $billing['email'] ) ? sanitize_email( $billing['email'] ) : '';
 		$currency = strtolower( (string) $order->currency );
+		$orders   = vintrica_vignette_form()->orders;
+		$token    = $orders->ensure_redirect_token( (int) $order->id );
 
 		if ( '' === $currency ) {
 			$currency = 'eur';
@@ -548,8 +662,8 @@ class Vintrica_Stripe {
 					'quantity'   => 1,
 				),
 			),
-			'success_url'         => $this->get_success_url( $order->order_number ),
-			'cancel_url'          => $this->get_cancel_url( $order->order_number ),
+			'success_url'         => $this->get_success_url( (int) $order->id, $token ),
+			'cancel_url'          => $this->get_cancel_url( (int) $order->id, $token ),
 		);
 
 		/**
@@ -617,60 +731,37 @@ class Vintrica_Stripe {
 	}
 
 	/**
-	 * Build Stripe success URL.
+	 * Build Stripe success URL with order ID and secure token.
 	 *
-	 * @param string $order_number Order number.
+	 * @param int    $order_id Order ID.
+	 * @param string $token    Redirect token.
 	 * @return string
 	 */
-	public function get_success_url( $order_number ) {
+	public function get_success_url( $order_id, $token ) {
 		return add_query_arg(
 			array(
-				'vintrica_order' => rawurlencode( $order_number ),
-				'vintrica_paid'  => '1',
+				'vintrica_order_id' => (int) $order_id,
+				'token'             => sanitize_text_field( (string) $token ),
 			),
-			home_url( '/' )
+			$this->get_success_redirect_base_url()
 		);
 	}
 
 	/**
-	 * Build Stripe cancel URL.
+	 * Build Stripe cancel URL with order ID and secure token.
 	 *
-	 * @param string $order_number Order number.
+	 * @param int    $order_id Order ID.
+	 * @param string $token    Redirect token.
 	 * @return string
 	 */
-	public function get_cancel_url( $order_number ) {
+	public function get_cancel_url( $order_id, $token ) {
 		return add_query_arg(
 			array(
-				'vintrica_order'     => rawurlencode( $order_number ),
-				'vintrica_cancelled' => '1',
+				'vintrica_order_id' => (int) $order_id,
+				'token'             => sanitize_text_field( (string) $token ),
 			),
-			$this->get_checkout_return_base_url()
+			$this->get_cancel_redirect_base_url()
 		);
-	}
-
-	/**
-	 * Resolve a safe return URL for Stripe cancel redirects.
-	 *
-	 * @return string
-	 */
-	private function get_checkout_return_base_url() {
-		if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
-			$referer      = esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) );
-			$home_host    = wp_parse_url( home_url(), PHP_URL_HOST );
-			$referer_host = wp_parse_url( $referer, PHP_URL_HOST );
-
-			if ( ! empty( $home_host ) && ! empty( $referer_host ) && $home_host === $referer_host ) {
-				return $referer;
-			}
-		}
-
-		$referer = wp_get_referer();
-
-		if ( $referer ) {
-			return $referer;
-		}
-
-		return home_url( '/' );
 	}
 
 	/**
