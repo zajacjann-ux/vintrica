@@ -275,6 +275,9 @@ class Vintrica_Orders {
 			)
 		);
 	}
+
+	/**
+	 * Get order by ID.
 	 *
 	 * @param int $order_id Order ID.
 	 * @return object|null

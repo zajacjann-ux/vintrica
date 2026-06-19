@@ -1,6 +1,6 @@
 # VINTRICA Vignette Form — Production Test Checklist
 
-Use this checklist after installing `vintrica-vignette-form-1.3.1.zip` on a staging WordPress site.
+Use this checklist after installing `vintrica-vignette-form-1.3.2.zip` on a staging WordPress site.
 
 ## Stripe Configuration
 
@@ -29,4 +29,4 @@ php bin/verify.php
 bash bin/build.sh
 ```
 
-Expected ZIP: `dist/vintrica-vignette-form-1.3.1.zip`
+Expected ZIP: `dist/vintrica-vignette-form-1.3.2.zip`
