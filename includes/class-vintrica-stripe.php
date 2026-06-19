@@ -33,6 +33,11 @@ class Vintrica_Stripe {
 	const OPTION_TEST_MODE = 'vintrica_stripe_test_mode';
 
 	/**
+	 * Stripe Checkout product name.
+	 */
+	const CHECKOUT_PRODUCT_NAME = 'Diaľničné známky VINTRICA';
+
+	/**
 	 * Get Stripe secret key.
 	 *
 	 * @return string
@@ -87,6 +92,165 @@ class Vintrica_Stripe {
 	}
 
 	/**
+	 * Detect secret key prefix for diagnostics.
+	 *
+	 * @return string One of: sk_test, sk_live, missing, invalid.
+	 */
+	public function get_secret_key_prefix() {
+		$key = trim( $this->get_secret_key() );
+
+		if ( '' === $key ) {
+			return 'missing';
+		}
+
+		if ( 0 === strpos( $key, 'sk_test_' ) ) {
+			return 'sk_test';
+		}
+
+		if ( 0 === strpos( $key, 'sk_live_' ) ) {
+			return 'sk_live';
+		}
+
+		return 'invalid';
+	}
+
+	/**
+	 * Validate secret key matches selected test/live mode.
+	 *
+	 * @return true|WP_Error
+	 */
+	public function validate_secret_key_mode() {
+		$prefix = $this->get_secret_key_prefix();
+
+		if ( 'missing' === $prefix ) {
+			return new WP_Error(
+				'vintrica_stripe_missing_key',
+				__( 'Secret Key nie je nastavený.', 'vintrica-vignette-form' )
+			);
+		}
+
+		if ( 'invalid' === $prefix ) {
+			return new WP_Error(
+				'vintrica_stripe_invalid_key',
+				__( 'Secret Key má neplatný formát. Musí začínať na sk_test_ alebo sk_live_.', 'vintrica-vignette-form' )
+			);
+		}
+
+		if ( $this->is_test_mode() && 'sk_test' !== $prefix ) {
+			return new WP_Error(
+				'vintrica_stripe_key_mode_mismatch',
+				__( 'Testovací režim je zapnutý, ale Secret Key nezačína na sk_test_.', 'vintrica-vignette-form' )
+			);
+		}
+
+		if ( ! $this->is_test_mode() && 'sk_live' !== $prefix ) {
+			return new WP_Error(
+				'vintrica_stripe_key_mode_mismatch',
+				__( 'Testovací režim je vypnutý, ale Secret Key nezačína na sk_live_.', 'vintrica-vignette-form' )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get Slovak admin warning when keys do not match mode.
+	 *
+	 * @return string
+	 */
+	public function get_key_mode_warning() {
+		$validation = $this->validate_secret_key_mode();
+
+		if ( true === $validation ) {
+			return '';
+		}
+
+		return $validation->get_error_message();
+	}
+
+	/**
+	 * Build diagnostic data for the admin settings panel.
+	 *
+	 * @param string $sample_order_number Sample order number for URL preview.
+	 * @return array<string, mixed>
+	 */
+	public function get_diagnostics( $sample_order_number = 'VIN-DEMO-0001' ) {
+		return array(
+			'test_mode'            => $this->is_test_mode(),
+			'has_secret_key'       => '' !== trim( $this->get_secret_key() ),
+			'has_publishable_key'  => '' !== trim( $this->get_publishable_key() ),
+			'has_webhook_secret'   => '' !== trim( $this->get_webhook_secret() ),
+			'key_prefix'           => $this->get_secret_key_prefix(),
+			'success_url'          => $this->get_success_url( $sample_order_number ),
+			'cancel_url'           => $this->get_cancel_url( $sample_order_number ),
+			'key_warning'          => $this->get_key_mode_warning(),
+		);
+	}
+
+	/**
+	 * Test Stripe API connectivity using the configured secret key.
+	 *
+	 * @return true|WP_Error
+	 */
+	public function test_connection() {
+		$validation = $this->validate_secret_key_mode();
+
+		if ( is_wp_error( $validation ) ) {
+			$this->log_error( 'Stripe connection test failed (key validation)', $validation->get_error_message() );
+			return $validation;
+		}
+
+		$response = wp_remote_get(
+			'https://api.stripe.com/v1/balance',
+			array(
+				'timeout' => 15,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $this->get_secret_key(),
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			$this->log_error( 'Stripe connection test request failed', $response->get_error_message() );
+
+			return new WP_Error(
+				'vintrica_stripe_test_request_failed',
+				__( 'Nepodarilo sa kontaktovať Stripe API. Skontrolujte sieťovú konektivitu servera.', 'vintrica-vignette-form' )
+			);
+		}
+
+		$status_code = (int) wp_remote_retrieve_response_code( $response );
+		$body        = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+		if ( $status_code >= 200 && $status_code < 300 ) {
+			$this->log_debug(
+				'Stripe connection test succeeded',
+				array(
+					'status_code' => $status_code,
+					'key_prefix'  => $this->get_secret_key_prefix(),
+					'test_mode'   => $this->is_test_mode(),
+				)
+			);
+
+			return true;
+		}
+
+		$this->log_error(
+			'Stripe connection test failed',
+			array(
+				'status_code'    => $status_code,
+				'stripe_message' => $this->extract_stripe_error_message( $body ),
+				'body'           => $body,
+			)
+		);
+
+		return new WP_Error(
+			'vintrica_stripe_test_failed',
+			$this->get_admin_stripe_error_message( $body, __( 'Stripe pripojenie zlyhalo. Skontrolujte Secret Key a režim test/live.', 'vintrica-vignette-form' ) )
+		);
+	}
+
+	/**
 	 * Save Stripe settings.
 	 *
 	 * @param array $settings Settings payload.
@@ -107,14 +271,53 @@ class Vintrica_Stripe {
 	 * @return array{session_id: string, checkout_url: string, payload: array<string, mixed>}|WP_Error
 	 */
 	public function create_checkout_session( $order, array $totals ) {
-		$payload = $this->build_session_payload( $order, $totals );
+		$key_validation = $this->validate_secret_key_mode();
 
-		if ( ! $this->is_configured() ) {
+		if ( is_wp_error( $key_validation ) ) {
+			$this->log_error( 'Stripe checkout blocked by key validation', $key_validation->get_error_message() );
+
 			return new WP_Error(
 				'vintrica_stripe_not_configured',
 				__( 'Stripe nie je správne nastavený.', 'vintrica-vignette-form' )
 			);
 		}
+
+		$unit_amount = $this->get_total_amount_cents( $totals );
+
+		if ( $unit_amount < 50 ) {
+			$this->log_error(
+				'Stripe checkout amount below minimum',
+				array(
+					'order_id'     => (int) $order->id,
+					'order_number' => $order->order_number,
+					'unit_amount'  => $unit_amount,
+					'totals'       => $totals,
+				)
+			);
+
+			return new WP_Error(
+				'vintrica_stripe_invalid_amount',
+				__( 'Stripe platbu sa nepodarilo inicializovať. Skúste to prosím neskôr.', 'vintrica-vignette-form' )
+			);
+		}
+
+		$payload = $this->build_session_payload( $order, $totals, $unit_amount );
+		$body    = $this->encode_session_body( $payload );
+
+		$this->log_debug(
+			'Creating Stripe Checkout Session',
+			array(
+				'order_id'     => (int) $order->id,
+				'order_number' => $order->order_number,
+				'unit_amount'  => $unit_amount,
+				'currency'     => $payload['line_items'][0]['price_data']['currency'] ?? 'eur',
+				'success_url'  => $payload['success_url'],
+				'cancel_url'   => $payload['cancel_url'],
+				'test_mode'    => $this->is_test_mode(),
+				'key_prefix'   => $this->get_secret_key_prefix(),
+				'request_body' => $body,
+			)
+		);
 
 		$response = wp_remote_post(
 			'https://api.stripe.com/v1/checkout/sessions',
@@ -123,12 +326,12 @@ class Vintrica_Stripe {
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $this->get_secret_key(),
 				),
-				'body'    => $this->encode_session_body( $payload ),
+				'body'    => $body,
 			)
 		);
 
 		if ( is_wp_error( $response ) ) {
-			$this->log_error( 'Stripe request failed', $response->get_error_message() );
+			$this->log_error( 'Stripe checkout request failed', $response->get_error_message() );
 
 			return new WP_Error(
 				'vintrica_stripe_request_failed',
@@ -137,14 +340,17 @@ class Vintrica_Stripe {
 		}
 
 		$status_code = (int) wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		$raw_body    = (string) wp_remote_retrieve_body( $response );
+		$body        = json_decode( $raw_body, true );
 
 		if ( $status_code < 200 || $status_code >= 300 || ! is_array( $body ) ) {
 			$this->log_error(
-				'Stripe API error',
+				'Stripe checkout API error',
 				array(
-					'status_code' => $status_code,
-					'body'        => $body,
+					'status_code'    => $status_code,
+					'stripe_message' => $this->extract_stripe_error_message( $body ),
+					'raw_body'       => $raw_body,
+					'request_body'   => $this->encode_session_body( $payload ),
 				)
 			);
 
@@ -162,6 +368,15 @@ class Vintrica_Stripe {
 				__( 'Stripe nevrátilo platobnú adresu. Skúste to prosím neskôr.', 'vintrica-vignette-form' )
 			);
 		}
+
+		$this->log_debug(
+			'Stripe Checkout Session created',
+			array(
+				'order_id'     => (int) $order->id,
+				'order_number' => $order->order_number,
+				'session_id'   => isset( $body['id'] ) ? (string) $body['id'] : '',
+			)
+		);
 
 		return array(
 			'session_id'   => isset( $body['id'] ) ? (string) $body['id'] : '',
@@ -299,13 +514,19 @@ class Vintrica_Stripe {
 	/**
 	 * Build Stripe Checkout Session payload.
 	 *
-	 * @param object $order  Order row.
-	 * @param array  $totals Calculated totals.
+	 * @param object $order       Order row.
+	 * @param array  $totals      Calculated totals.
+	 * @param int    $unit_amount Total amount in cents.
 	 * @return array<string, mixed>
 	 */
-	private function build_session_payload( $order, array $totals ) {
-		$billing = json_decode( (string) $order->billing, true );
-		$email   = is_array( $billing ) && ! empty( $billing['email'] ) ? sanitize_email( $billing['email'] ) : '';
+	private function build_session_payload( $order, array $totals, $unit_amount ) {
+		$billing  = json_decode( (string) $order->billing, true );
+		$email    = is_array( $billing ) && ! empty( $billing['email'] ) ? sanitize_email( $billing['email'] ) : '';
+		$currency = strtolower( (string) $order->currency );
+
+		if ( '' === $currency ) {
+			$currency = 'eur';
+		}
 
 		$payload = array(
 			'mode'                => 'payment',
@@ -315,7 +536,18 @@ class Vintrica_Stripe {
 				'vintrica_order_id'     => (string) (int) $order->id,
 				'vintrica_order_number' => $order->order_number,
 			),
-			'line_items'          => $this->build_line_items( $order, $totals ),
+			'line_items'          => array(
+				array(
+					'price_data' => array(
+						'currency'     => $currency,
+						'unit_amount'  => $unit_amount,
+						'product_data' => array(
+							'name' => self::CHECKOUT_PRODUCT_NAME,
+						),
+					),
+					'quantity'   => 1,
+				),
+			),
 			'success_url'         => $this->get_success_url( $order->order_number ),
 			'cancel_url'          => $this->get_cancel_url( $order->order_number ),
 		);
@@ -330,40 +562,15 @@ class Vintrica_Stripe {
 	}
 
 	/**
-	 * Build Stripe line items from server-side totals.
+	 * Convert order totals to Stripe cents.
 	 *
-	 * @param object $order  Order row.
-	 * @param array  $totals Calculated totals.
-	 * @return array<int, array<string, mixed>>
+	 * @param array $totals Calculated totals.
+	 * @return int
 	 */
-	private function build_line_items( $order, array $totals ) {
-		$items = array(
-			array(
-				'price_data' => array(
-					'currency'     => strtolower( $order->currency ),
-					'unit_amount'  => (int) round( (float) $totals['subtotal'] * 100 ),
-					'product_data' => array(
-						'name' => __( 'Diaľničné známky', 'vintrica-vignette-form' ),
-					),
-				),
-				'quantity'   => 1,
-			),
-		);
+	private function get_total_amount_cents( array $totals ) {
+		$total = isset( $totals['total'] ) ? (float) $totals['total'] : 0.0;
 
-		if ( (float) $totals['service_fee'] > 0 ) {
-			$items[] = array(
-				'price_data' => array(
-					'currency'     => strtolower( $order->currency ),
-					'unit_amount'  => (int) round( (float) $totals['service_fee'] * 100 ),
-					'product_data' => array(
-						'name' => __( 'Servisný poplatok', 'vintrica-vignette-form' ),
-					),
-				),
-				'quantity'   => 1,
-			);
-		}
-
-		return $items;
+		return (int) round( $total * 100 );
 	}
 
 	/**
@@ -415,7 +622,7 @@ class Vintrica_Stripe {
 	 * @param string $order_number Order number.
 	 * @return string
 	 */
-	private function get_success_url( $order_number ) {
+	public function get_success_url( $order_number ) {
 		return add_query_arg(
 			array(
 				'vintrica_order' => rawurlencode( $order_number ),
@@ -431,28 +638,110 @@ class Vintrica_Stripe {
 	 * @param string $order_number Order number.
 	 * @return string
 	 */
-	private function get_cancel_url( $order_number ) {
+	public function get_cancel_url( $order_number ) {
 		return add_query_arg(
 			array(
 				'vintrica_order'     => rawurlencode( $order_number ),
 				'vintrica_cancelled' => '1',
 			),
-			wp_get_referer() ? wp_get_referer() : home_url( '/' )
+			$this->get_checkout_return_base_url()
 		);
 	}
 
 	/**
-	 * Log Stripe errors for administrators and debug mode.
+	 * Resolve a safe return URL for Stripe cancel redirects.
+	 *
+	 * @return string
+	 */
+	private function get_checkout_return_base_url() {
+		if ( ! empty( $_SERVER['HTTP_REFERER'] ) ) {
+			$referer      = esc_url_raw( wp_unslash( $_SERVER['HTTP_REFERER'] ) );
+			$home_host    = wp_parse_url( home_url(), PHP_URL_HOST );
+			$referer_host = wp_parse_url( $referer, PHP_URL_HOST );
+
+			if ( ! empty( $home_host ) && ! empty( $referer_host ) && $home_host === $referer_host ) {
+				return $referer;
+			}
+		}
+
+		$referer = wp_get_referer();
+
+		if ( $referer ) {
+			return $referer;
+		}
+
+		return home_url( '/' );
+	}
+
+	/**
+	 * Extract Stripe error message from API response body.
+	 *
+	 * @param mixed $body Decoded Stripe response.
+	 * @return string
+	 */
+	private function extract_stripe_error_message( $body ) {
+		if ( is_array( $body ) && ! empty( $body['error']['message'] ) ) {
+			return (string) $body['error']['message'];
+		}
+
+		return '';
+	}
+
+	/**
+	 * Build an admin-safe Stripe error message including API detail.
+	 *
+	 * @param mixed  $body           Decoded Stripe response.
+	 * @param string $fallback_message Fallback message.
+	 * @return string
+	 */
+	private function get_admin_stripe_error_message( $body, $fallback_message ) {
+		$stripe_message = $this->extract_stripe_error_message( $body );
+
+		if ( '' === $stripe_message ) {
+			return $fallback_message;
+		}
+
+		return sprintf(
+			/* translators: %s: Stripe API error message */
+			__( 'Stripe API: %s', 'vintrica-vignette-form' ),
+			$stripe_message
+		);
+	}
+
+	/**
+	 * Log Stripe debug details for administrators.
+	 *
+	 * @param string       $message Log message.
+	 * @param array|string $context Additional context.
+	 * @return void
+	 */
+	private function log_debug( $message, $context = '' ) {
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return;
+		}
+
+		$this->write_log( $message, $context );
+	}
+
+	/**
+	 * Log Stripe errors for administrators (always written to error_log).
 	 *
 	 * @param string       $message Log message.
 	 * @param array|string $context Additional context.
 	 * @return void
 	 */
 	private function log_error( $message, $context = '' ) {
-		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
-			return;
-		}
+		$this->write_log( $message, $context );
+	}
 
+	/**
+	 * Write a log line to PHP error_log.
+	 *
+	 * @param string       $message Log message.
+	 * @param array|string $context Additional context.
+	 * @return void
+	 */
+	private function write_log( $message, $context = '' ) {
 		if ( is_array( $context ) || is_object( $context ) ) {
 			$context = wp_json_encode( $context );
 		}

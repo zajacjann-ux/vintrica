@@ -38,6 +38,11 @@ class Vintrica_Admin {
 	const STRIPE_SETTINGS_NONCE = 'vintrica_admin_stripe_settings';
 
 	/**
+	 * Nonce action for Stripe connection test.
+	 */
+	const STRIPE_TEST_NONCE = 'vintrica_admin_stripe_test';
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -115,6 +120,11 @@ class Vintrica_Admin {
 			return;
 		}
 
+		if ( isset( $_POST['vintrica_stripe_test_submit'] ) ) {
+			$this->handle_stripe_test_connection();
+			return;
+		}
+
 		if ( isset( $_POST['vintrica_order_status_submit'], $_POST['order_id'], $_POST['order_status'] ) ) {
 			$this->handle_order_status_update();
 		}
@@ -147,6 +157,39 @@ class Vintrica_Admin {
 		);
 
 		add_settings_error( 'vintrica_stripe', 'vintrica_stripe_saved', __( 'Nastavenia Stripe boli uložené.', 'vintrica-vignette-form' ), 'updated' );
+
+		$key_warning = vintrica_vignette_form()->stripe->get_key_mode_warning();
+
+		if ( '' !== $key_warning ) {
+			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_key_warning', $key_warning, 'warning' );
+		}
+	}
+
+	/**
+	 * Run Stripe API connectivity test from admin.
+	 *
+	 * @return void
+	 */
+	private function handle_stripe_test_connection() {
+		if ( ! isset( $_POST['vintrica_stripe_test_nonce'] ) ) {
+			return;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_test_nonce'] ) );
+
+		if ( ! wp_verify_nonce( $nonce, self::STRIPE_TEST_NONCE ) ) {
+			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_test_nonce', __( 'Overenie bezpečnosti zlyhalo.', 'vintrica-vignette-form' ), 'error' );
+			return;
+		}
+
+		$result = vintrica_vignette_form()->stripe->test_connection();
+
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_test_failed', $result->get_error_message(), 'error' );
+			return;
+		}
+
+		add_settings_error( 'vintrica_stripe', 'vintrica_stripe_test_ok', __( 'Stripe pripojenie je funkčné.', 'vintrica-vignette-form' ), 'updated' );
 	}
 
 	/**
@@ -442,7 +485,8 @@ class Vintrica_Admin {
 
 		settings_errors( 'vintrica_stripe' );
 
-		$stripe = vintrica_vignette_form()->stripe;
+		$stripe      = vintrica_vignette_form()->stripe;
+		$diagnostics = $stripe->get_diagnostics();
 
 		?>
 		<div class="wrap">
@@ -454,6 +498,52 @@ class Vintrica_Admin {
 			</p>
 			<div class="notice notice-info inline">
 				<p><?php echo esc_html__( 'Stránka s checkout formulárom musí byť vylúčená z cache (WP Super Cache, LiteSpeed, Cloudflare a pod.), inak platobný nonce expiruje a tlačidlo Zaplatiť zlyhá.', 'vintrica-vignette-form' ); ?></p>
+			</div>
+
+			<?php if ( ! empty( $diagnostics['key_warning'] ) ) : ?>
+				<div class="notice notice-warning">
+					<p><?php echo esc_html( $diagnostics['key_warning'] ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<div class="vintrica-stripe-diagnostics">
+				<h2><?php echo esc_html__( 'Diagnostika Stripe', 'vintrica-vignette-form' ); ?></h2>
+				<table class="widefat striped vintrica-admin-table">
+					<tbody>
+						<tr>
+							<th><?php echo esc_html__( 'Testovací režim', 'vintrica-vignette-form' ); ?></th>
+							<td><?php echo esc_html( $diagnostics['test_mode'] ? __( 'Zapnutý', 'vintrica-vignette-form' ) : __( 'Vypnutý (live)', 'vintrica-vignette-form' ) ); ?></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Secret Key', 'vintrica-vignette-form' ); ?></th>
+							<td><?php echo esc_html( $diagnostics['has_secret_key'] ? __( 'Nastavený', 'vintrica-vignette-form' ) : __( 'Chýba', 'vintrica-vignette-form' ) ); ?></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Publishable Key', 'vintrica-vignette-form' ); ?></th>
+							<td><?php echo esc_html( $diagnostics['has_publishable_key'] ? __( 'Nastavený', 'vintrica-vignette-form' ) : __( 'Chýba', 'vintrica-vignette-form' ) ); ?></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Webhook Secret', 'vintrica-vignette-form' ); ?></th>
+							<td><?php echo esc_html( $diagnostics['has_webhook_secret'] ? __( 'Nastavený', 'vintrica-vignette-form' ) : __( 'Chýba', 'vintrica-vignette-form' ) ); ?></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Typ Secret Key', 'vintrica-vignette-form' ); ?></th>
+							<td><code><?php echo esc_html( $diagnostics['key_prefix'] ); ?></code></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Success URL', 'vintrica-vignette-form' ); ?></th>
+							<td><code><?php echo esc_html( $diagnostics['success_url'] ); ?></code></td>
+						</tr>
+						<tr>
+							<th><?php echo esc_html__( 'Cancel URL', 'vintrica-vignette-form' ); ?></th>
+							<td><code><?php echo esc_html( $diagnostics['cancel_url'] ); ?></code></td>
+						</tr>
+					</tbody>
+				</table>
+				<form method="post" class="vintrica-stripe-test-form">
+					<?php wp_nonce_field( self::STRIPE_TEST_NONCE, 'vintrica_stripe_test_nonce' ); ?>
+					<?php submit_button( __( 'Otestovať Stripe pripojenie', 'vintrica-vignette-form' ), 'secondary', 'vintrica_stripe_test_submit', false ); ?>
+				</form>
 			</div>
 			<form method="post">
 				<?php wp_nonce_field( self::STRIPE_SETTINGS_NONCE, 'vintrica_stripe_settings_nonce' ); ?>
