@@ -65,6 +65,43 @@
 		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 	}
 
+	var uiIcons = {
+		highway: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5l4 2 4-2 4 2 4-2v14"/><path d="M8 11v8M12 9v10M16 11v8"/></svg>',
+		vehicle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17h-.5a2.5 2.5 0 0 1 0-5h.9l1.2-3.6A2 2 0 0 1 10.5 7h3a2 2 0 0 1 1.9 1.4l1.2 3.6h.9a2.5 2.5 0 0 1 0 5H17"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>',
+		plate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h4M18 10h.01"/></svg>',
+		calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+		globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+		edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+		remove: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>'
+	};
+
+	function getCountryAccent(code) {
+		var accents = {
+			at: '#dc2626',
+			ch: '#b91c1c',
+			si: '#2563eb',
+			hu: '#059669',
+			cz: '#0891b2',
+			sk: '#4f46e5'
+		};
+
+		return accents[code] || '#4f46e5';
+	}
+
+	function createReviewDetail(label, value, iconKey) {
+		var detail = document.createElement('div');
+		detail.className = 'vintrica-review-vignette-card__detail';
+
+		detail.innerHTML =
+			'<span class="vintrica-review-vignette-card__detail-icon">' + uiIcons[iconKey] + '</span>' +
+			'<span class="vintrica-review-vignette-card__detail-label">' + label + '</span>' +
+			'<span class="vintrica-review-vignette-card__detail-value"></span>';
+
+		detail.querySelector('.vintrica-review-vignette-card__detail-value').textContent = value;
+
+		return detail;
+	}
+
 	function VintricaBuilder(form) {
 		this.form = form;
 		this.vignettes = [];
@@ -988,9 +1025,16 @@
 		var i;
 		var vignette;
 		var card;
-		var row;
+		var header;
+		var headerIcon;
+		var headerMain;
+		var badge;
+		var title;
+		var priceEl;
+		var body;
+		var footer;
+		var editButton;
 		var removeButton;
-		var price;
 		var addressParts;
 		var billingCountry;
 
@@ -998,37 +1042,77 @@
 
 		for (i = 0; i < this.vignettes.length; i += 1) {
 			vignette = this.vignettes[i];
-			price = getValidityPrice(vignette.country, vignette.vignette_validity);
 
 			card = document.createElement('article');
-			card.className = 'vintrica-review-card';
+			card.className = 'vintrica-review-vignette-card';
+			card.style.setProperty('--vintrica-card-accent', getCountryAccent(vignette.country));
 
-			card.innerHTML =
-				'<dl class="vintrica-review-card__grid">' +
-				'<div><dt>' + strings.labelVignetteCountry + '</dt><dd>' + getCountryLabel(vignette.country) + '</dd></div>' +
-				'<div><dt>' + strings.labelValidity + '</dt><dd>' + getValidityLabel(vignette.country, vignette.vignette_validity) + '</dd></div>' +
-				'<div><dt>' + strings.labelVehicleType + '</dt><dd>' + getVehicleLabel(vignette.vehicle_type) + '</dd></div>' +
-				'<div><dt>' + strings.plateLabel + '</dt><dd>' + vignette.license_plate + '</dd></div>' +
-				'<div><dt>' + strings.labelRegistrationCountry + '</dt><dd>' + getCountryLabel(vignette.registration_country) + '</dd></div>' +
-				'<div><dt>' + strings.labelStartDate + '</dt><dd>' + vignette.start_date + '</dd></div>' +
-				'<div><dt>' + strings.labelPrice + '</dt><dd>' + formatPrice(price) + '</dd></div>' +
-				'</dl>';
+			header = document.createElement('header');
+			header.className = 'vintrica-review-vignette-card__header';
 
-			row = document.createElement('div');
-			row.className = 'vintrica-review-card__actions';
+			headerIcon = document.createElement('div');
+			headerIcon.className = 'vintrica-review-vignette-card__header-icon';
+			headerIcon.innerHTML = uiIcons.highway;
+
+			headerMain = document.createElement('div');
+			headerMain.className = 'vintrica-review-vignette-card__header-main';
+
+			badge = document.createElement('span');
+			badge.className = 'vintrica-review-vignette-card__badge';
+			badge.textContent = String(vignette.country || '').toUpperCase();
+
+			title = document.createElement('h4');
+			title.className = 'vintrica-review-vignette-card__title';
+			title.textContent = getCountryLabel(vignette.country) + ' · ' + getValidityLabel(vignette.country, vignette.vignette_validity);
+
+			headerMain.appendChild(badge);
+			headerMain.appendChild(title);
+
+			priceEl = document.createElement('div');
+			priceEl.className = 'vintrica-review-vignette-card__price';
+			priceEl.textContent = formatPrice(getValidityPrice(vignette.country, vignette.vignette_validity));
+
+			header.appendChild(headerIcon);
+			header.appendChild(headerMain);
+			header.appendChild(priceEl);
+
+			body = document.createElement('div');
+			body.className = 'vintrica-review-vignette-card__body';
+			body.appendChild(createReviewDetail(strings.labelVehicleType, getVehicleLabel(vignette.vehicle_type), 'vehicle'));
+			body.appendChild(createReviewDetail(strings.plateLabel, vignette.license_plate, 'plate'));
+			body.appendChild(createReviewDetail(strings.labelStartDate, vignette.start_date, 'calendar'));
+			body.appendChild(createReviewDetail(strings.labelRegistrationCountry, getCountryLabel(vignette.registration_country), 'globe'));
+
+			footer = document.createElement('footer');
+			footer.className = 'vintrica-review-vignette-card__footer';
+
+			editButton = document.createElement('button');
+			editButton.type = 'button';
+			editButton.className = 'vintrica-review-vignette-card__action vintrica-review-vignette-card__action--edit';
+			editButton.innerHTML = uiIcons.edit + '<span>' + strings.edit + '</span>';
+			editButton.addEventListener('click', (function (index) {
+				return function () {
+					self.startEdit(index);
+					self.goToStep(1);
+				};
+			}(i)));
 
 			removeButton = document.createElement('button');
 			removeButton.type = 'button';
-			removeButton.className = 'vintrica-button vintrica-button--link vintrica-button--danger';
-			removeButton.textContent = strings.remove;
+			removeButton.className = 'vintrica-review-vignette-card__action vintrica-review-vignette-card__action--remove';
+			removeButton.innerHTML = uiIcons.remove + '<span>' + strings.remove + '</span>';
 			removeButton.addEventListener('click', (function (index) {
 				return function () {
 					self.removeVignette(index, true);
 				};
 			}(i)));
 
-			row.appendChild(removeButton);
-			card.appendChild(row);
+			footer.appendChild(editButton);
+			footer.appendChild(removeButton);
+
+			card.appendChild(header);
+			card.appendChild(body);
+			card.appendChild(footer);
 			this.reviewVignettes.appendChild(card);
 		}
 
@@ -1053,7 +1137,7 @@
 			'<div><dt>' + strings.labelPhone + '</dt><dd>' + this.escapeHtml(this.billingFields.phone.value.trim()) + '</dd></div>' +
 			'<div><dt>' + strings.labelCompany + '</dt><dd>' + this.escapeHtml(this.billingFields.company.value.trim() || '—') + '</dd></div>' +
 			'<div><dt>' + strings.labelIco + '</dt><dd>' + this.escapeHtml(this.billingFields.ico.value.trim() || '—') + '</dd></div>' +
-			'<div><dt>' + strings.labelDic + '</dt><dd>' + this.escapeHtml(this.billingFields.dic.value.trim() || '—') + '</dd></div>' +
+			'<div><dt>' + strings.labelDic + '</dt><dd>' + this.escapeHtml(this.billingFields.dic.value.trim()) + '</dd></div>' +
 			'<div><dt>' + strings.labelIcDph + '</dt><dd>' + this.escapeHtml(this.billingFields.ic_dph.value.trim() || '—') + '</dd></div>' +
 			'<div><dt>' + strings.labelAddress + '</dt><dd>' + this.escapeHtml(addressParts.join(', ')) + '</dd></div>' +
 			'</dl>';

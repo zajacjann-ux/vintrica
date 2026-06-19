@@ -647,9 +647,12 @@ class Vintrica_Frontend {
 								<?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?>
 							</h2>
 
-							<h3 class="vintrica-review__subtitle"><?php echo esc_html__( 'Vybrané známky', 'vintrica-vignette-form' ); ?></h3>
-							<div class="vintrica-review-vignettes" aria-live="polite"></div>
+							<div class="vintrica-review-vignettes-section">
+								<h3 class="vintrica-review__subtitle"><?php echo esc_html__( 'Vybrané známky', 'vintrica-vignette-form' ); ?></h3>
+								<div class="vintrica-review-vignettes" aria-live="polite"></div>
+							</div>
 
+							<h3 class="vintrica-review__subtitle"><?php echo esc_html__( 'Súhrn objednávky', 'vintrica-vignette-form' ); ?></h3>
 							<dl class="vintrica-summary-totals vintrica-review-totals">
 								<div class="vintrica-summary-totals__row">
 									<dt><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></dt>
