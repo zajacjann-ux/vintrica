@@ -381,21 +381,29 @@ class Vintrica_Frontend {
 					<input type="hidden" name="<?php echo esc_attr( self::VIGNETTES_FIELD ); ?>" id="vintrica-vignettes-data" value="" />
 
 					<ol class="vintrica-steps" aria-label="<?php echo esc_attr__( 'Kroky objednávky', 'vintrica-vignette-form' ); ?>">
-						<li class="vintrica-steps__item is-active" data-vintrica-step-indicator="1">
-							<span class="vintrica-steps__number">1</span>
-							<span class="vintrica-steps__label"><?php echo esc_html__( 'Výber známok', 'vintrica-vignette-form' ); ?></span>
+						<li class="vintrica-steps__item is-active is-clickable" data-vintrica-step-indicator="1">
+							<button type="button" class="vintrica-steps__trigger" data-vintrica-step-nav="1">
+								<span class="vintrica-steps__number">1</span>
+								<span class="vintrica-steps__label"><?php echo esc_html__( 'Výber známok', 'vintrica-vignette-form' ); ?></span>
+							</button>
 						</li>
-						<li class="vintrica-steps__item" data-vintrica-step-indicator="2">
-							<span class="vintrica-steps__number">2</span>
-							<span class="vintrica-steps__label"><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></span>
+						<li class="vintrica-steps__item is-disabled" data-vintrica-step-indicator="2">
+							<button type="button" class="vintrica-steps__trigger" data-vintrica-step-nav="2" disabled>
+								<span class="vintrica-steps__number">2</span>
+								<span class="vintrica-steps__label"><?php echo esc_html__( 'Fakturačné údaje', 'vintrica-vignette-form' ); ?></span>
+							</button>
 						</li>
-						<li class="vintrica-steps__item" data-vintrica-step-indicator="3">
-							<span class="vintrica-steps__number">3</span>
-							<span class="vintrica-steps__label"><?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?></span>
+						<li class="vintrica-steps__item is-disabled" data-vintrica-step-indicator="3">
+							<button type="button" class="vintrica-steps__trigger" data-vintrica-step-nav="3" disabled>
+								<span class="vintrica-steps__number">3</span>
+								<span class="vintrica-steps__label"><?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?></span>
+							</button>
 						</li>
-						<li class="vintrica-steps__item" data-vintrica-step-indicator="4">
-							<span class="vintrica-steps__number">4</span>
-							<span class="vintrica-steps__label"><?php echo esc_html__( 'Stripe platba', 'vintrica-vignette-form' ); ?></span>
+						<li class="vintrica-steps__item is-disabled" data-vintrica-step-indicator="4" aria-disabled="true">
+							<span class="vintrica-steps__trigger vintrica-steps__trigger--static">
+								<span class="vintrica-steps__number">4</span>
+								<span class="vintrica-steps__label"><?php echo esc_html__( 'Stripe platba', 'vintrica-vignette-form' ); ?></span>
+							</span>
 						</li>
 					</ol>
 

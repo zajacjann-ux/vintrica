@@ -16,6 +16,7 @@
 	--vintrica-warning-soft: #fffbeb;
 	--vintrica-radius: 10px;
 	--vintrica-input-height: 46px;
+	--vintrica-icon-gutter: 2.875rem;
 	--vintrica-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
 	--vintrica-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
 	--vintrica-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
@@ -102,26 +103,31 @@
 
 .vintrica-control__icon {
 	position: absolute;
-	left: 0.875rem;
-	z-index: 2;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 3;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 1.25rem;
-	height: 1.25rem;
+	width: var(--vintrica-icon-gutter);
 	color: var(--vintrica-text-muted);
 	pointer-events: none;
 }
 
+.vintrica-control__icon svg {
+	display: block;
+	flex-shrink: 0;
+}
+
 .vintrica-field--has-icon .vintrica-control input,
-.vintrica-field--has-icon .vintrica-control select,
-.vintrica-field--has-icon .vintrica-control .choices {
+.vintrica-field--has-icon .vintrica-control select {
 	width: 100%;
 }
 
 .vintrica-field--has-icon .vintrica-control input {
 	height: var(--vintrica-input-height);
-	padding: 0 0.875rem 0 2.75rem;
+	padding: 0 0.875rem 0 var(--vintrica-icon-gutter);
 	border: 1px solid var(--vintrica-border);
 	border-radius: var(--vintrica-radius);
 	font-size: 0.9375rem;
@@ -130,6 +136,14 @@
 	color: var(--vintrica-text);
 	box-shadow: var(--vintrica-shadow-sm);
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vintrica-field--has-icon .vintrica-control input[type="date"] {
+	padding-right: 0.5rem;
+}
+
+.vintrica-field--has-icon .vintrica-control input[type="date"]::-webkit-calendar-picker-indicator {
+	margin-left: 0.25rem;
 }
 
 .vintrica-field input,
@@ -172,18 +186,18 @@
 	font-size: 0.9375rem;
 }
 
-.vintrica-vignette-form-wrapper .vintrica-field--has-icon .vintrica-choices {
-	padding-left: 2.75rem;
-}
-
 .vintrica-vignette-form-wrapper .vintrica-choices__inner {
 	min-height: var(--vintrica-input-height);
 	height: var(--vintrica-input-height);
-	padding: 0 2rem 0 0;
+	padding: 0 2rem 0 0.875rem;
 	border: 1px solid var(--vintrica-border);
 	border-radius: var(--vintrica-radius);
 	background: var(--vintrica-surface);
 	box-shadow: var(--vintrica-shadow-sm);
+}
+
+.vintrica-vignette-form-wrapper .vintrica-field--has-icon .vintrica-choices__inner {
+	padding-left: var(--vintrica-icon-gutter);
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices.is-focused .vintrica-choices__inner,
@@ -193,12 +207,18 @@
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices__list--single {
-	padding: 0 0.875rem;
+	padding: 0;
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices__list--single .choices__item {
+	padding-right: 0.25rem;
 	line-height: calc(var(--vintrica-input-height) - 2px);
 	color: var(--vintrica-text);
+}
+
+.vintrica-vignette-form-wrapper .vintrica-field--has-icon .vintrica-choices__input {
+	padding-left: 0;
+	margin-left: 0;
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices[data-type*="select-one"]::after {
@@ -541,16 +561,50 @@
 
 .vintrica-steps__item {
 	display: flex;
-	align-items: center;
-	gap: 0.5rem;
+	align-items: stretch;
 	min-height: 2.75rem;
-	padding: 0.45rem 0.75rem;
 	border: 1px solid var(--vintrica-border);
 	border-radius: var(--vintrica-radius);
 	background: var(--vintrica-surface);
 	color: var(--vintrica-text-muted);
 	font-size: 0.8125rem;
 	box-shadow: var(--vintrica-shadow-sm);
+}
+
+.vintrica-steps__trigger {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	min-height: 2.75rem;
+	padding: 0.45rem 0.75rem;
+	border: 0;
+	border-radius: inherit;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.vintrica-steps__trigger--static {
+	cursor: default;
+}
+
+.vintrica-steps__item.is-clickable .vintrica-steps__trigger:hover,
+.vintrica-steps__item.is-clickable .vintrica-steps__trigger:focus-visible {
+	background: #f8fafc;
+	outline: none;
+	box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.18);
+}
+
+.vintrica-steps__item.is-disabled {
+	opacity: 0.55;
+}
+
+.vintrica-steps__item.is-disabled .vintrica-steps__trigger {
+	cursor: not-allowed;
+	pointer-events: none;
 }
 
 .vintrica-steps__item.is-active {
@@ -560,10 +614,20 @@
 	font-weight: 650;
 }
 
+.vintrica-steps__item.is-active.is-clickable .vintrica-steps__trigger:hover,
+.vintrica-steps__item.is-active.is-clickable .vintrica-steps__trigger:focus-visible {
+	background: rgba(79, 70, 229, 0.08);
+}
+
 .vintrica-steps__item.is-complete {
 	border-color: #a7f3d0;
 	background: var(--vintrica-success-soft);
 	color: var(--vintrica-success);
+}
+
+.vintrica-steps__item.is-complete.is-clickable .vintrica-steps__trigger:hover,
+.vintrica-steps__item.is-complete.is-clickable .vintrica-steps__trigger:focus-visible {
+	background: rgba(5, 150, 105, 0.08);
 }
 
 .vintrica-steps__number {

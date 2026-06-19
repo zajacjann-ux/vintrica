@@ -100,6 +100,7 @@
 		this.stepBilling = form.querySelector('.vintrica-step--billing');
 		this.stepReview = form.querySelector('.vintrica-step--review');
 		this.stepIndicators = form.querySelectorAll('[data-vintrica-step-indicator]');
+		this.stepNavButtons = form.querySelectorAll('[data-vintrica-step-nav]');
 		this.reviewVignettes = form.querySelector('.vintrica-review-vignettes');
 		this.reviewBilling = form.querySelector('.vintrica-review-billing');
 		this.reviewSubtotal = form.querySelector('.vintrica-review-subtotal');
@@ -131,6 +132,7 @@
 		this.initAllChoices();
 		this.loadFromStorage();
 		this.renderSummary();
+		this.updateStepIndicators();
 	}
 
 	VintricaBuilder.prototype.clearStorage = function () {
@@ -190,6 +192,59 @@
 
 		this.form.addEventListener('submit', function (event) {
 			event.preventDefault();
+		});
+
+		this.stepNavButtons.forEach(function (button) {
+			button.addEventListener('click', function () {
+				var step = parseInt(button.getAttribute('data-vintrica-step-nav'), 10);
+
+				if (!step || button.disabled) {
+					return;
+				}
+
+				self.goToStep(step);
+			});
+		});
+
+		this.form.addEventListener('change', function () {
+			self.updateStepIndicators();
+		});
+
+		this.form.addEventListener('input', function () {
+			self.updateStepIndicators();
+		});
+	};
+
+	VintricaBuilder.prototype.canNavigateToStep = function (step) {
+		if (step === 1) {
+			return true;
+		}
+
+		if (step === 2) {
+			return this.validateContinue().valid;
+		}
+
+		if (step === 3) {
+			return this.vignettes.length > 0 && this.validateBilling().valid;
+		}
+
+		return false;
+	};
+
+	VintricaBuilder.prototype.updateStepIndicators = function () {
+		var self = this;
+
+		this.stepIndicators.forEach(function (indicator) {
+			var step = parseInt(indicator.getAttribute('data-vintrica-step-indicator'), 10);
+			var button = indicator.querySelector('[data-vintrica-step-nav]');
+			var clickable = step <= 3 && self.canNavigateToStep(step);
+
+			indicator.classList.toggle('is-clickable', clickable);
+			indicator.classList.toggle('is-disabled', !clickable);
+
+			if (button) {
+				button.disabled = !clickable;
+			}
 		});
 	};
 
@@ -299,28 +354,58 @@
 
 	VintricaBuilder.prototype.goToStep = function (step) {
 		var validation;
+		var isBackward = step < this.currentStep;
+
+		if (step === 4) {
+			return;
+		}
+
+		if (step === 1) {
+			this.clearFormError();
+			this.clearBillingError();
+			this.clearReviewError();
+		}
 
 		if (step === 2) {
-			validation = this.validateContinue();
-
-			if (!validation.valid) {
-				this.showFormError(validation.message);
+			if (!this.canNavigateToStep(2)) {
+				if (!isBackward) {
+					this.showFormError(this.validateContinue().message || strings.validationOrderEmpty);
+				}
 				return;
 			}
 
-			this.clearFormError();
-			this.persistState();
+			if (!isBackward) {
+				validation = this.validateContinue();
+
+				if (!validation.valid) {
+					this.showFormError(validation.message);
+					return;
+				}
+
+				this.clearFormError();
+				this.persistState();
+			}
 		}
 
 		if (step === 3) {
-			validation = this.validateCheckout();
-
-			if (!validation.valid) {
-				this.showBillingError(validation.message);
+			if (!this.canNavigateToStep(3)) {
+				if (!isBackward) {
+					this.showBillingError(this.validateBilling().message || strings.validationBillingRequired);
+				}
 				return;
 			}
 
+			if (!isBackward) {
+				validation = this.validateCheckout();
+
+				if (!validation.valid) {
+					this.showBillingError(validation.message);
+					return;
+				}
+			}
+
 			this.clearBillingError();
+			this.clearReviewError();
 			this.renderReview();
 		}
 
@@ -337,6 +422,12 @@
 			indicator.classList.toggle('is-active', indicatorStep === step);
 			indicator.classList.toggle('is-complete', indicatorStep < step);
 		});
+
+		this.updateStepIndicators();
+
+		if (step === 1) {
+			this.stepBuilder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
 
 		if (step === 2) {
 			this.clearBillingError();
