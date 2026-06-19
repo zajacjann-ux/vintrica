@@ -36,6 +36,13 @@ final class Vintrica_Vignette_Form {
 	private static $instance = null;
 
 	/**
+	 * Pricing handler.
+	 *
+	 * @var Vintrica_Pricing
+	 */
+	public $pricing;
+
+	/**
 	 * Security handler.
 	 *
 	 * @var Vintrica_Security
@@ -91,6 +98,7 @@ final class Vintrica_Vignette_Form {
 	 * @return void
 	 */
 	private function load_dependencies() {
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-pricing.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-security.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-admin.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-frontend.php';
@@ -103,9 +111,10 @@ final class Vintrica_Vignette_Form {
 	 * @return void
 	 */
 	private function init_components() {
-		$this->security    = new Vintrica_Security();
+		$this->pricing     = new Vintrica_Pricing();
+		$this->security    = new Vintrica_Security( $this->pricing );
 		$this->admin       = new Vintrica_Admin();
-		$this->frontend    = new Vintrica_Frontend( $this->security );
+		$this->frontend    = new Vintrica_Frontend( $this->security, $this->pricing );
 		$this->woocommerce = new Vintrica_WooCommerce();
 	}
 

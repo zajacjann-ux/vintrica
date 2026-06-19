@@ -23,11 +23,11 @@ class Vintrica_Security {
 	const FORM_NONCE_NAME = 'vintrica_vignette_nonce';
 
 	/**
-	 * Allowed form field keys.
+	 * Single vignette field keys.
 	 *
 	 * @var string[]
 	 */
-	private $allowed_fields = array(
+	private $vignette_fields = array(
 		'country',
 		'vehicle_type',
 		'vignette_validity',
@@ -35,6 +35,22 @@ class Vintrica_Security {
 		'license_plate',
 		'registration_country',
 	);
+
+	/**
+	 * Pricing handler.
+	 *
+	 * @var Vintrica_Pricing
+	 */
+	private $pricing;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Vintrica_Pricing $pricing Pricing handler.
+	 */
+	public function __construct( Vintrica_Pricing $pricing ) {
+		$this->pricing = $pricing;
+	}
 
 	/**
 	 * Render the form nonce field.
@@ -80,27 +96,102 @@ class Vintrica_Security {
 			return false;
 		}
 
-		$home_host     = wp_parse_url( home_url(), PHP_URL_HOST );
-		$referer_host  = wp_parse_url( $referer, PHP_URL_HOST );
+		$home_host    = wp_parse_url( home_url(), PHP_URL_HOST );
+		$referer_host = wp_parse_url( $referer, PHP_URL_HOST );
 
 		return ! empty( $home_host ) && $home_host === $referer_host;
 	}
 
 	/**
-	 * Sanitize submitted form data.
+	 * Sanitize and validate submitted vignette order payload.
 	 *
-	 * @param array $raw_data Raw POST data.
-	 * @return array
+	 * @param string $raw_json Raw JSON string from POST.
+	 * @return array<int, array<string, string>>|WP_Error
 	 */
-	public function sanitize_form_data( array $raw_data ) {
-		$sanitized = array();
+	public function sanitize_vignette_order( $raw_json ) {
+		$raw_json = wp_unslash( $raw_json );
 
-		foreach ( $this->allowed_fields as $field_key ) {
-			if ( ! isset( $raw_data[ $field_key ] ) ) {
-				continue;
+		if ( ! is_string( $raw_json ) || '' === trim( $raw_json ) ) {
+			return new WP_Error( 'vintrica_empty_order', __( 'No vignettes were submitted.', 'vintrica-vignette-form' ) );
+		}
+
+		$decoded = json_decode( $raw_json, true );
+
+		if ( ! is_array( $decoded ) || empty( $decoded ) ) {
+			return new WP_Error( 'vintrica_invalid_order', __( 'Invalid vignette order data.', 'vintrica-vignette-form' ) );
+		}
+
+		$countries     = $this->pricing->get_countries();
+		$vehicle_types = $this->pricing->get_vehicle_types();
+		$validities    = $this->pricing->get_country_validities();
+		$sanitized     = array();
+
+		foreach ( $decoded as $index => $item ) {
+			if ( ! is_array( $item ) ) {
+				return new WP_Error(
+					'vintrica_invalid_item',
+					sprintf(
+						/* translators: %d: vignette index */
+						__( 'Invalid vignette at position %d.', 'vintrica-vignette-form' ),
+						(int) $index + 1
+					)
+				);
 			}
 
-			$value = wp_unslash( $raw_data[ $field_key ] );
+			$vignette = $this->sanitize_vignette_item( $item );
+
+			if ( is_wp_error( $vignette ) ) {
+				return $vignette;
+			}
+
+			if ( ! isset( $countries[ $vignette['country'] ] ) ) {
+				return new WP_Error( 'vintrica_invalid_country', __( 'Invalid country selected.', 'vintrica-vignette-form' ) );
+			}
+
+			if ( ! isset( $vehicle_types[ $vignette['vehicle_type'] ] ) ) {
+				return new WP_Error( 'vintrica_invalid_vehicle', __( 'Invalid vehicle type selected.', 'vintrica-vignette-form' ) );
+			}
+
+			if ( ! isset( $validities[ $vignette['country'] ][ $vignette['vignette_validity'] ] ) ) {
+				return new WP_Error( 'vintrica_invalid_validity', __( 'Invalid vignette validity for the selected country.', 'vintrica-vignette-form' ) );
+			}
+
+			if ( ! isset( $countries[ $vignette['registration_country'] ] ) ) {
+				return new WP_Error( 'vintrica_invalid_registration', __( 'Invalid registration country selected.', 'vintrica-vignette-form' ) );
+			}
+
+			if ( empty( $vignette['start_date'] ) || empty( $vignette['license_plate'] ) ) {
+				return new WP_Error( 'vintrica_missing_fields', __( 'Each vignette must include a start date and license plate.', 'vintrica-vignette-form' ) );
+			}
+
+			$sanitized[] = $vignette;
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Sanitize a single vignette item.
+	 *
+	 * @param array $item Raw vignette item.
+	 * @return array<string, string>|WP_Error
+	 */
+	private function sanitize_vignette_item( array $item ) {
+		$sanitized = array();
+
+		foreach ( $this->vignette_fields as $field_key ) {
+			if ( ! isset( $item[ $field_key ] ) ) {
+				return new WP_Error(
+					'vintrica_missing_field',
+					sprintf(
+						/* translators: %s: field name */
+						__( 'Missing required field: %s', 'vintrica-vignette-form' ),
+						esc_html( $field_key )
+					)
+				);
+			}
+
+			$value = $item[ $field_key ];
 
 			switch ( $field_key ) {
 				case 'start_date':
@@ -112,7 +203,7 @@ class Vintrica_Security {
 					break;
 
 				default:
-					$sanitized[ $field_key ] = sanitize_text_field( $value );
+					$sanitized[ $field_key ] = sanitize_key( $value );
 					break;
 			}
 		}

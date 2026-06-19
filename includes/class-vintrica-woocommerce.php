@@ -51,29 +51,29 @@ class Vintrica_WooCommerce {
 	}
 
 	/**
-	 * Handle validated form submissions for WooCommerce processing.
+	 * Handle validated order submissions for WooCommerce processing.
 	 *
-	 * @param array $form_data Sanitized form data.
+	 * @param array $order_data Validated order with vignettes and totals.
 	 * @return void
 	 */
-	public function handle_form_submission( array $form_data ) {
+	public function handle_form_submission( array $order_data ) {
 		/**
-		 * Fires when a vignette form submission is ready for WooCommerce processing.
+		 * Fires when a vignette order is ready for WooCommerce processing.
 		 *
-		 * @param array $form_data Sanitized form data.
+		 * @param array $order_data Validated order with vignettes and totals.
 		 */
-		do_action( 'vintrica_before_add_to_cart', $form_data );
+		do_action( 'vintrica_before_add_to_cart', $order_data );
 
 		// WooCommerce cart and checkout integration will be implemented here.
 	}
 
 	/**
-	 * Map form data to WooCommerce cart item meta.
+	 * Map a vignette item to WooCommerce cart item meta.
 	 *
-	 * @param array $form_data Sanitized form data.
+	 * @param array $vignette Sanitized vignette item.
 	 * @return array<string, string>
 	 */
-	public function map_form_data_to_cart_meta( array $form_data ) {
+	public function map_vignette_to_cart_meta( array $vignette ) {
 		/**
 		 * Filter cart item meta mapped from vignette form data.
 		 *
@@ -83,14 +83,14 @@ class Vintrica_WooCommerce {
 		return apply_filters(
 			'vintrica_vignette_cart_item_meta',
 			array(
-				'vintrica_country'              => isset( $form_data['country'] ) ? $form_data['country'] : '',
-				'vintrica_vehicle_type'         => isset( $form_data['vehicle_type'] ) ? $form_data['vehicle_type'] : '',
-				'vintrica_vignette_validity'    => isset( $form_data['vignette_validity'] ) ? $form_data['vignette_validity'] : '',
-				'vintrica_start_date'           => isset( $form_data['start_date'] ) ? $form_data['start_date'] : '',
-				'vintrica_license_plate'        => isset( $form_data['license_plate'] ) ? $form_data['license_plate'] : '',
-				'vintrica_registration_country' => isset( $form_data['registration_country'] ) ? $form_data['registration_country'] : '',
+				'vintrica_country'              => isset( $vignette['country'] ) ? $vignette['country'] : '',
+				'vintrica_vehicle_type'         => isset( $vignette['vehicle_type'] ) ? $vignette['vehicle_type'] : '',
+				'vintrica_vignette_validity'    => isset( $vignette['vignette_validity'] ) ? $vignette['vignette_validity'] : '',
+				'vintrica_start_date'           => isset( $vignette['start_date'] ) ? $vignette['start_date'] : '',
+				'vintrica_license_plate'        => isset( $vignette['license_plate'] ) ? $vignette['license_plate'] : '',
+				'vintrica_registration_country' => isset( $vignette['registration_country'] ) ? $vignette['registration_country'] : '',
 			),
-			$form_data
+			$vignette
 		);
 	}
 }

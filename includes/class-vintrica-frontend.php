@@ -18,6 +18,11 @@ class Vintrica_Frontend {
 	const SHORTCODE = 'vintrica_vignette_form';
 
 	/**
+	 * Hidden field name for vignette order payload.
+	 */
+	const VIGNETTES_FIELD = 'vintrica_vignettes';
+
+	/**
 	 * Security handler instance.
 	 *
 	 * @var Vintrica_Security
@@ -25,12 +30,21 @@ class Vintrica_Frontend {
 	private $security;
 
 	/**
+	 * Pricing handler instance.
+	 *
+	 * @var Vintrica_Pricing
+	 */
+	private $pricing;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Vintrica_Security $security Security handler.
+	 * @param Vintrica_Pricing  $pricing  Pricing handler.
 	 */
-	public function __construct( Vintrica_Security $security ) {
+	public function __construct( Vintrica_Security $security, Vintrica_Pricing $pricing ) {
 		$this->security = $security;
+		$this->pricing  = $pricing;
 
 		add_action( 'init', array( $this, 'register_shortcode' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
@@ -69,13 +83,43 @@ class Vintrica_Frontend {
 	}
 
 	/**
-	 * Enqueue frontend assets.
+	 * Enqueue frontend assets and pass server-side config to JavaScript.
 	 *
 	 * @return void
 	 */
 	private function enqueue_assets() {
 		wp_enqueue_style( 'vintrica-frontend' );
 		wp_enqueue_script( 'vintrica-frontend' );
+
+		wp_localize_script(
+			'vintrica-frontend',
+			'vintricaConfig',
+			array(
+				'config'  => $this->pricing->get_frontend_config(),
+				'strings' => array(
+					'selectCountry'           => __( 'Select country', 'vintrica-vignette-form' ),
+					'selectValidity'          => __( 'Select validity', 'vintrica-vignette-form' ),
+					'selectVehicleType'       => __( 'Select vehicle type', 'vintrica-vignette-form' ),
+					'selectRegistrationCountry' => __( 'Select registration country', 'vintrica-vignette-form' ),
+					'addVignette'             => __( 'Add vignette', 'vintrica-vignette-form' ),
+					'updateVignette'          => __( 'Update vignette', 'vintrica-vignette-form' ),
+					'cancelEdit'              => __( 'Cancel edit', 'vintrica-vignette-form' ),
+					'edit'                    => __( 'Edit', 'vintrica-vignette-form' ),
+					'remove'                  => __( 'Remove', 'vintrica-vignette-form' ),
+					'emptySummary'            => __( 'No vignettes added yet.', 'vintrica-vignette-form' ),
+					'vignetteCount'           => __( 'Vignettes', 'vintrica-vignette-form' ),
+					'subtotal'                => __( 'Subtotal', 'vintrica-vignette-form' ),
+					'serviceFee'              => __( 'Service fee', 'vintrica-vignette-form' ),
+					'total'                   => __( 'Total', 'vintrica-vignette-form' ),
+					'builderTitle'            => __( 'Add vignette', 'vintrica-vignette-form' ),
+					'summaryTitle'            => __( 'Your order', 'vintrica-vignette-form' ),
+					'validationRequired'      => __( 'Please complete all required fields.', 'vintrica-vignette-form' ),
+					'validationOrderEmpty'    => __( 'Add at least one vignette before continuing.', 'vintrica-vignette-form' ),
+					'plateLabel'              => __( 'Plate', 'vintrica-vignette-form' ),
+					'startsLabel'             => __( 'Starts', 'vintrica-vignette-form' ),
+				),
+			)
+		);
 	}
 
 	/**
@@ -97,24 +141,49 @@ class Vintrica_Frontend {
 			return;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified above.
-		$form_data = $this->security->sanitize_form_data( $_POST );
-
-		if ( empty( $form_data ) ) {
-			$this->set_notice( 'error', __( 'No valid form data was submitted.', 'vintrica-vignette-form' ) );
+		if ( ! isset( $_POST[ self::VIGNETTES_FIELD ] ) ) {
+			$this->set_notice( 'error', __( 'No vignette order was submitted.', 'vintrica-vignette-form' ) );
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified above.
+		$raw_order = wp_unslash( $_POST[ self::VIGNETTES_FIELD ] );
+		$vignettes = $this->security->sanitize_vignette_order( $raw_order );
+
+		if ( is_wp_error( $vignettes ) ) {
+			$this->set_notice( 'error', $vignettes->get_error_message() );
+			return;
+		}
+
+		$totals = $this->pricing->calculate_totals( $vignettes );
+
+		$order_data = array(
+			'vignettes' => $vignettes,
+			'totals'    => $totals,
+		);
+
 		/**
-		 * Fires after the vignette form is validated and sanitized.
+		 * Fires after the vignette order is validated and priced server-side.
 		 *
 		 * WooCommerce integration will hook into this action in a future release.
 		 *
-		 * @param array $form_data Sanitized form data.
+		 * @param array $order_data Validated order with vignettes and totals.
 		 */
-		do_action( 'vintrica_vignette_form_submitted', $form_data );
+		do_action( 'vintrica_vignette_form_submitted', $order_data );
 
-		$this->set_notice( 'success', __( 'Your vignette request has been received.', 'vintrica-vignette-form' ) );
+		$this->set_notice(
+			'success',
+			sprintf(
+				/* translators: %d: number of vignettes */
+				_n(
+					'Your order with %d vignette has been received.',
+					'Your order with %d vignettes has been received.',
+					$totals['count'],
+					'vintrica-vignette-form'
+				),
+				(int) $totals['count']
+			)
+		);
 	}
 
 	/**
@@ -167,7 +236,8 @@ class Vintrica_Frontend {
 	public function render_form( $atts = array() ) {
 		$this->enqueue_assets();
 
-		$field_options = $this->get_field_options();
+		$countries     = $this->pricing->get_countries();
+		$vehicle_types = $this->pricing->get_vehicle_types();
 		$notices       = $this->get_notices();
 
 		ob_start();
@@ -175,68 +245,133 @@ class Vintrica_Frontend {
 		<div class="vintrica-vignette-form-wrapper">
 			<?php $this->render_notices( $notices ); ?>
 
-			<form class="vintrica-vignette-form" method="post" action="<?php echo esc_url( get_permalink() ); ?>">
+			<form class="vintrica-vignette-form" method="post" action="<?php echo esc_url( get_permalink() ); ?>" novalidate>
 				<?php $this->security->render_nonce_field(); ?>
 
-				<div class="vintrica-field">
-					<label for="vintrica-country"><?php echo esc_html__( 'Country', 'vintrica-vignette-form' ); ?></label>
-					<select id="vintrica-country" name="country" required>
-						<option value=""><?php echo esc_html__( 'Select country', 'vintrica-vignette-form' ); ?></option>
-						<?php foreach ( $field_options['countries'] as $value => $label ) : ?>
-							<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
+				<input type="hidden" name="<?php echo esc_attr( self::VIGNETTES_FIELD ); ?>" id="vintrica-vignettes-data" value="" />
 
-				<div class="vintrica-field">
-					<label for="vintrica-vehicle-type"><?php echo esc_html__( 'Vehicle type', 'vintrica-vignette-form' ); ?></label>
-					<select id="vintrica-vehicle-type" name="vehicle_type" required>
-						<option value=""><?php echo esc_html__( 'Select vehicle type', 'vintrica-vignette-form' ); ?></option>
-						<?php foreach ( $field_options['vehicle_types'] as $value => $label ) : ?>
-							<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
+				<div class="vintrica-builder">
+					<section class="vintrica-builder__panel vintrica-builder__panel--form" aria-labelledby="vintrica-builder-title">
+						<h2 id="vintrica-builder-title" class="vintrica-builder__title">
+							<?php echo esc_html__( 'Add vignette', 'vintrica-vignette-form' ); ?>
+						</h2>
 
-				<div class="vintrica-field">
-					<label for="vintrica-vignette-validity"><?php echo esc_html__( 'Vignette validity', 'vintrica-vignette-form' ); ?></label>
-					<select id="vintrica-vignette-validity" name="vignette_validity" required>
-						<option value=""><?php echo esc_html__( 'Select validity', 'vintrica-vignette-form' ); ?></option>
-						<?php foreach ( $field_options['vignette_validities'] as $value => $label ) : ?>
-							<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
+						<div class="vintrica-builder__fields">
+							<div class="vintrica-field">
+								<label for="vintrica-country"><?php echo esc_html__( 'Country', 'vintrica-vignette-form' ); ?></label>
+								<select id="vintrica-country" data-vintrica-field="country">
+									<option value=""><?php echo esc_html__( 'Select country', 'vintrica-vignette-form' ); ?></option>
+									<?php foreach ( $countries as $value => $label ) : ?>
+										<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</div>
 
-				<div class="vintrica-field">
-					<label for="vintrica-start-date"><?php echo esc_html__( 'Start date', 'vintrica-vignette-form' ); ?></label>
-					<input type="date" id="vintrica-start-date" name="start_date" required />
-				</div>
+							<div class="vintrica-field">
+								<label for="vintrica-vehicle-type"><?php echo esc_html__( 'Vehicle type', 'vintrica-vignette-form' ); ?></label>
+								<select id="vintrica-vehicle-type" data-vintrica-field="vehicle_type">
+									<option value=""><?php echo esc_html__( 'Select vehicle type', 'vintrica-vignette-form' ); ?></option>
+									<?php foreach ( $vehicle_types as $value => $label ) : ?>
+										<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</div>
 
-				<div class="vintrica-field">
-					<label for="vintrica-license-plate"><?php echo esc_html__( 'License plate', 'vintrica-vignette-form' ); ?></label>
-					<input type="text" id="vintrica-license-plate" name="license_plate" maxlength="20" required />
-				</div>
+							<div class="vintrica-field">
+								<label for="vintrica-vignette-validity"><?php echo esc_html__( 'Vignette validity', 'vintrica-vignette-form' ); ?></label>
+								<select id="vintrica-vignette-validity" data-vintrica-field="vignette_validity" disabled>
+									<option value=""><?php echo esc_html__( 'Select country first', 'vintrica-vignette-form' ); ?></option>
+								</select>
+							</div>
 
-				<div class="vintrica-field">
-					<label for="vintrica-registration-country"><?php echo esc_html__( 'Registration country', 'vintrica-vignette-form' ); ?></label>
-					<select id="vintrica-registration-country" name="registration_country" required>
-						<option value=""><?php echo esc_html__( 'Select registration country', 'vintrica-vignette-form' ); ?></option>
-						<?php foreach ( $field_options['countries'] as $value => $label ) : ?>
-							<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
-						<?php endforeach; ?>
-					</select>
+							<div class="vintrica-field">
+								<label for="vintrica-start-date"><?php echo esc_html__( 'Start date', 'vintrica-vignette-form' ); ?></label>
+								<input type="date" id="vintrica-start-date" data-vintrica-field="start_date" />
+							</div>
+
+							<div class="vintrica-field">
+								<label for="vintrica-license-plate"><?php echo esc_html__( 'License plate', 'vintrica-vignette-form' ); ?></label>
+								<input type="text" id="vintrica-license-plate" data-vintrica-field="license_plate" maxlength="20" />
+							</div>
+
+							<div class="vintrica-field">
+								<label for="vintrica-registration-country"><?php echo esc_html__( 'Registration country', 'vintrica-vignette-form' ); ?></label>
+								<select id="vintrica-registration-country" data-vintrica-field="registration_country">
+									<option value=""><?php echo esc_html__( 'Select registration country', 'vintrica-vignette-form' ); ?></option>
+									<?php foreach ( $countries as $value => $label ) : ?>
+										<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</div>
+						</div>
+
+						<div class="vintrica-builder__actions">
+							<button type="button" class="vintrica-button vintrica-button--secondary vintrica-cancel-edit" hidden>
+								<?php echo esc_html__( 'Cancel edit', 'vintrica-vignette-form' ); ?>
+							</button>
+							<button type="button" class="vintrica-button vintrica-button--primary vintrica-add-vignette">
+								<?php echo esc_html__( 'Add vignette', 'vintrica-vignette-form' ); ?>
+							</button>
+						</div>
+
+						<div class="vintrica-form-error" role="alert" hidden></div>
+					</section>
+
+					<section class="vintrica-builder__panel vintrica-builder__panel--summary" aria-labelledby="vintrica-summary-title">
+						<h2 id="vintrica-summary-title" class="vintrica-builder__title">
+							<?php echo esc_html__( 'Your order', 'vintrica-vignette-form' ); ?>
+						</h2>
+
+						<ul class="vintrica-summary-list" aria-live="polite"></ul>
+
+						<div class="vintrica-summary-empty">
+							<?php echo esc_html__( 'No vignettes added yet.', 'vintrica-vignette-form' ); ?>
+						</div>
+
+						<dl class="vintrica-summary-totals">
+							<div class="vintrica-summary-totals__row">
+								<dt><?php echo esc_html__( 'Vignettes', 'vintrica-vignette-form' ); ?></dt>
+								<dd class="vintrica-total-count">0</dd>
+							</div>
+							<div class="vintrica-summary-totals__row">
+								<dt><?php echo esc_html__( 'Subtotal', 'vintrica-vignette-form' ); ?></dt>
+								<dd class="vintrica-total-subtotal"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
+							</div>
+							<div class="vintrica-summary-totals__row">
+								<dt><?php echo esc_html__( 'Service fee', 'vintrica-vignette-form' ); ?></dt>
+								<dd class="vintrica-total-service-fee"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
+							</div>
+							<div class="vintrica-summary-totals__row vintrica-summary-totals__row--total">
+								<dt><?php echo esc_html__( 'Total', 'vintrica-vignette-form' ); ?></dt>
+								<dd class="vintrica-total-amount"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
+							</div>
+						</dl>
+					</section>
 				</div>
 
 				<div class="vintrica-field vintrica-field--submit">
-					<button type="submit" name="vintrica_vignette_submit" value="1" class="vintrica-submit">
-						<?php echo esc_html__( 'Submit', 'vintrica-vignette-form' ); ?>
+					<button type="submit" name="vintrica_vignette_submit" value="1" class="vintrica-submit" disabled>
+						<?php echo esc_html__( 'Continue', 'vintrica-vignette-form' ); ?>
 					</button>
 				</div>
 			</form>
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * Format a price for display.
+	 *
+	 * @param float $amount Amount to format.
+	 * @return string
+	 */
+	private function format_price( $amount ) {
+		return sprintf(
+			'%s %s',
+			esc_html( $this->pricing->get_currency() ),
+			esc_html( number_format_i18n( (float) $amount, 2 ) )
+		);
 	}
 
 	/**
@@ -264,45 +399,5 @@ class Vintrica_Frontend {
 				esc_html( $message )
 			);
 		}
-	}
-
-	/**
-	 * Get selectable field options.
-	 *
-	 * Options will be configurable via admin settings in a future release.
-	 *
-	 * @return array<string, array<string, string>>
-	 */
-	private function get_field_options() {
-		/**
-		 * Filter vignette form field options.
-		 *
-		 * @param array<string, array<string, string>> $options Field option groups.
-		 */
-		return apply_filters(
-			'vintrica_vignette_form_field_options',
-			array(
-				'countries'           => array(
-					'at' => __( 'Austria', 'vintrica-vignette-form' ),
-					'ch' => __( 'Switzerland', 'vintrica-vignette-form' ),
-					'de' => __( 'Germany', 'vintrica-vignette-form' ),
-					'cz' => __( 'Czech Republic', 'vintrica-vignette-form' ),
-					'sk' => __( 'Slovakia', 'vintrica-vignette-form' ),
-					'hu' => __( 'Hungary', 'vintrica-vignette-form' ),
-					'si' => __( 'Slovenia', 'vintrica-vignette-form' ),
-				),
-				'vehicle_types'       => array(
-					'car'       => __( 'Car', 'vintrica-vignette-form' ),
-					'motorcycle'=> __( 'Motorcycle', 'vintrica-vignette-form' ),
-					'van'       => __( 'Van', 'vintrica-vignette-form' ),
-					'trailer'   => __( 'Trailer', 'vintrica-vignette-form' ),
-				),
-				'vignette_validities' => array(
-					'10d'  => __( '10 days', 'vintrica-vignette-form' ),
-					'2m'   => __( '2 months', 'vintrica-vignette-form' ),
-					'1y'   => __( '1 year', 'vintrica-vignette-form' ),
-				),
-			)
-		);
 	}
 }
