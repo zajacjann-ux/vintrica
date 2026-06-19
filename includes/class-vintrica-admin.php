@@ -199,6 +199,9 @@ class Vintrica_Admin {
 				<li><?php echo esc_html__( 'Kontrola objednávky', 'vintrica-vignette-form' ); ?></li>
 				<li><?php echo esc_html__( 'Stripe platba', 'vintrica-vignette-form' ); ?></li>
 			</ol>
+			<div class="notice notice-info inline">
+				<p><?php echo esc_html__( 'Ak používate cache plugin (WP Super Cache, LiteSpeed, Cloudflare a pod.), vylúčte stránku s formulárom z cache. Inak môže zlyhať overenie bezpečnosti pri platbe.', 'vintrica-vignette-form' ); ?></p>
+			</div>
 		</div>
 		<?php
 	}
@@ -449,6 +452,9 @@ class Vintrica_Admin {
 				<strong><?php echo esc_html__( 'VINTRICA webhook URL:', 'vintrica-vignette-form' ); ?></strong><br />
 				<code><?php echo esc_html( $stripe->get_webhook_url() ); ?></code>
 			</p>
+			<div class="notice notice-info inline">
+				<p><?php echo esc_html__( 'Stránka s checkout formulárom musí byť vylúčená z cache (WP Super Cache, LiteSpeed, Cloudflare a pod.), inak platobný nonce expiruje a tlačidlo Zaplatiť zlyhá.', 'vintrica-vignette-form' ); ?></p>
+			</div>
 			<form method="post">
 				<?php wp_nonce_field( self::STRIPE_SETTINGS_NONCE, 'vintrica_stripe_settings_nonce' ); ?>
 				<table class="form-table" role="presentation">

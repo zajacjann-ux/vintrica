@@ -109,12 +109,20 @@ class Vintrica_Frontend {
 			'vintrica-frontend',
 			'vintricaConfig',
 			array(
-				'storageKey'     => $storage_key,
-				'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
-				'checkoutAction' => 'vintrica_create_checkout_session',
-				'debug'          => defined( 'WP_DEBUG' ) && WP_DEBUG,
-				'config'         => $this->pricing->get_frontend_config(),
-				'strings'        => $this->get_js_strings(),
+				'storageKey' => $storage_key,
+				'debug'      => defined( 'WP_DEBUG' ) && WP_DEBUG,
+				'config'     => $this->pricing->get_frontend_config(),
+				'strings'    => $this->get_js_strings(),
+			)
+		);
+
+		wp_localize_script(
+			'vintrica-frontend',
+			'VintricaCheckout',
+			array(
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'nonce'    => wp_create_nonce( Vintrica_Security::CHECKOUT_NONCE_ACTION ),
+				'action'   => 'vintrica_create_checkout_session',
 			)
 		);
 	}
@@ -275,6 +283,10 @@ class Vintrica_Frontend {
 	 * @return string
 	 */
 	public function render_form( $atts = array() ) {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+
 		$storage_key  = $this->get_storage_key();
 		$order_number = $this->get_confirmed_order_number();
 

@@ -205,8 +205,7 @@
 		var validation;
 		var formData;
 		var originalText;
-		var ajaxUrl;
-		var checkoutAction;
+		var checkout;
 
 		if (event && typeof event.preventDefault === 'function') {
 			event.preventDefault();
@@ -228,11 +227,10 @@
 			return;
 		}
 
-		ajaxUrl = window.vintricaConfig.ajaxUrl;
-		checkoutAction = window.vintricaConfig.checkoutAction;
+		checkout = window.VintricaCheckout;
 
-		if (!ajaxUrl || !checkoutAction) {
-			this.debugLog('missing ajax config', { ajaxUrl: ajaxUrl, checkoutAction: checkoutAction });
+		if (!checkout || !checkout.ajax_url || !checkout.nonce || !checkout.action) {
+			this.debugLog('missing checkout config', checkout);
 			this.showReviewError(strings.paymentFailed);
 			return;
 		}
@@ -246,11 +244,12 @@
 		this.payButton.textContent = strings.paymentProcessing;
 
 		formData = new FormData(this.form);
-		formData.set('action', checkoutAction);
+		formData.set('action', checkout.action);
+		formData.set('nonce', checkout.nonce);
 
 		this.debugLog('creating checkout session');
 
-		fetch(ajaxUrl, {
+		fetch(checkout.ajax_url, {
 			method: 'POST',
 			credentials: 'same-origin',
 			body: formData

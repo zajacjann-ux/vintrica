@@ -23,6 +23,11 @@ class Vintrica_Security {
 	const FORM_NONCE_NAME = 'vintrica_vignette_nonce';
 
 	/**
+	 * Nonce action for AJAX checkout requests.
+	 */
+	const CHECKOUT_NONCE_ACTION = 'vintrica_checkout_nonce';
+
+	/**
 	 * Single vignette field keys.
 	 *
 	 * @var string[]

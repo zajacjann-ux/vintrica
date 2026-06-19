@@ -64,7 +64,15 @@ class Vintrica_Checkout {
 	 * @return void
 	 */
 	public function ajax_create_checkout_session() {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified in process_submission().
+		if ( ! check_ajax_referer( Vintrica_Security::CHECKOUT_NONCE_ACTION, 'nonce', false ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Overenie bezpečnosti zlyhalo. Obnovte stránku a skúste to znova.', 'vintrica-vignette-form' ),
+				)
+			);
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified above with check_ajax_referer().
 		$post_data = wp_unslash( $_POST );
 		$result    = $this->process_submission( is_array( $post_data ) ? $post_data : array() );
 
@@ -91,13 +99,6 @@ class Vintrica_Checkout {
 	 * @return array{checkout_url: string, order_number: string}|WP_Error
 	 */
 	public function process_submission( array $post_data ) {
-		if ( ! $this->security->verify_form_request_from_post( $post_data ) ) {
-			return new WP_Error(
-				'vintrica_security_failed',
-				__( 'Overenie bezpečnosti zlyhalo. Skúste to znova.', 'vintrica-vignette-form' )
-			);
-		}
-
 		if ( empty( $post_data['vintrica_vignettes'] ) ) {
 			return new WP_Error(
 				'vintrica_missing_vignettes',
