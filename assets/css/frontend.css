@@ -16,9 +16,10 @@
 	--vintrica-warning-soft: #fffbeb;
 	--vintrica-radius: 10px;
 	--vintrica-input-height: 46px;
-	--vintrica-icon-padding-left: 48px;
+	--vintrica-icon-padding-left: 64px;
+	--vintrica-icon-padding-right: 44px;
 	--vintrica-icon-size: 20px;
-	--vintrica-icon-left: 14px;
+	--vintrica-icon-left: 24px;
 	--vintrica-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
 	--vintrica-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
 	--vintrica-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
@@ -103,26 +104,47 @@
 
 .vintrica-control__icon {
 	position: absolute;
-	left: 14px;
+	left: 24px;
 	top: 50%;
 	transform: translateY(-50%);
 	pointer-events: none;
-	z-index: 2;
-	width: 20px;
-	height: 20px;
+	z-index: 3;
+	width: var(--vintrica-icon-size);
+	height: var(--vintrica-icon-size);
 	color: var(--vintrica-text-muted);
 }
 
 .vintrica-control__icon svg {
 	display: block;
-	width: 20px;
-	height: 20px;
+	width: var(--vintrica-icon-size);
+	height: var(--vintrica-icon-size);
 }
 
-.vintrica-control select,
 .vintrica-control input {
 	padding-left: 48px !important;
 	width: 100%;
+}
+
+.vintrica-control select {
+	width: 100%;
+	padding-left: 64px !important;
+	padding-right: 44px !important;
+	-webkit-padding-start: 64px !important;
+	-webkit-padding-end: 44px !important;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	text-indent: 0;
+	line-height: var(--vintrica-input-height);
+	background-color: var(--vintrica-surface);
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2364748b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 14px center;
+	background-size: 12px 8px;
+}
+
+.vintrica-control select::-ms-expand {
+	display: none;
 }
 
 .vintrica-field--has-icon .vintrica-control input {
@@ -140,12 +162,11 @@
 
 .vintrica-field--has-icon .vintrica-control select {
 	height: var(--vintrica-input-height);
-	padding-right: 0.875rem;
 	border: 1px solid var(--vintrica-border);
 	border-radius: var(--vintrica-radius);
 	font-size: 0.9375rem;
-	line-height: 1.4;
-	background: var(--vintrica-surface);
+	line-height: var(--vintrica-input-height);
+	background-color: var(--vintrica-surface);
 	color: var(--vintrica-text);
 	box-shadow: var(--vintrica-shadow-sm);
 }
@@ -205,15 +226,17 @@
 .vintrica-vignette-form-wrapper .vintrica-choices__inner {
 	min-height: var(--vintrica-input-height);
 	height: var(--vintrica-input-height);
-	padding: 0 2rem 0 0.875rem;
+	padding: 0 0.875rem;
 	border: 1px solid var(--vintrica-border);
 	border-radius: var(--vintrica-radius);
 	background: var(--vintrica-surface);
 	box-shadow: var(--vintrica-shadow-sm);
 }
 
-.vintrica-control .vintrica-choices__inner {
-	padding-left: 48px !important;
+.vintrica-control .vintrica-choices__inner,
+.vintrica-control .choices__inner {
+	padding-left: 64px !important;
+	padding-right: 44px !important;
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices.is-focused .vintrica-choices__inner,
@@ -227,12 +250,17 @@
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices__list--single .choices__item {
-	padding-right: 0.25rem;
+	padding-left: 0;
+	padding-right: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	line-height: calc(var(--vintrica-input-height) - 2px);
 	color: var(--vintrica-text);
+}
+
+.vintrica-control .choices__list--single .choices__item {
+	max-width: 100%;
 }
 
 .vintrica-vignette-form-wrapper .vintrica-control .vintrica-choices__input {
@@ -242,7 +270,8 @@
 }
 
 .vintrica-vignette-form-wrapper .vintrica-choices[data-type*="select-one"]::after {
-	right: 0.875rem;
+	right: 14px;
+	border-width: 5px;
 	border-color: var(--vintrica-text-muted) transparent transparent;
 	margin-top: -2px;
 }
