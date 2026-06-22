@@ -1,6 +1,6 @@
 <?php
 /**
- * Server-side pricing and validity configuration.
+ * Server-side pricing backed by the editable catalog.
  *
  * @package Vintrica_Vignette_Form
  */
@@ -11,6 +11,22 @@ defined( 'ABSPATH' ) || exit;
  * Class Vintrica_Pricing
  */
 class Vintrica_Pricing {
+
+	/**
+	 * Catalog handler.
+	 *
+	 * @var Vintrica_Catalog
+	 */
+	private $catalog;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Vintrica_Catalog $catalog Catalog handler.
+	 */
+	public function __construct( Vintrica_Catalog $catalog ) {
+		$this->catalog = $catalog;
+	}
 
 	/**
 	 * Get currency code.
@@ -41,7 +57,7 @@ class Vintrica_Pricing {
 	}
 
 	/**
-	 * Get country labels.
+	 * Get active country labels from catalog.
 	 *
 	 * @return array<string, string>
 	 */
@@ -51,17 +67,7 @@ class Vintrica_Pricing {
 		 *
 		 * @param array<string, string> $countries Country code => label.
 		 */
-		return apply_filters(
-			'vintrica_vignette_countries',
-			array(
-				'at' => __( 'Rakúsko', 'vintrica-vignette-form' ),
-				'ch' => __( 'Švajčiarsko', 'vintrica-vignette-form' ),
-				'cz' => __( 'Česko', 'vintrica-vignette-form' ),
-				'hu' => __( 'Maďarsko', 'vintrica-vignette-form' ),
-				'si' => __( 'Slovinsko', 'vintrica-vignette-form' ),
-				'sk' => __( 'Slovensko', 'vintrica-vignette-form' ),
-			)
-		);
+		return apply_filters( 'vintrica_vignette_countries', $this->catalog->get_country_map() );
 	}
 
 	/**
@@ -75,134 +81,73 @@ class Vintrica_Pricing {
 		 *
 		 * @param array<string, string> $types Vehicle type code => label.
 		 */
-		return apply_filters(
-			'vintrica_vignette_vehicle_types',
-			array(
-				'car'        => __( 'Osobné vozidlo', 'vintrica-vignette-form' ),
-				'motorcycle' => __( 'Motocykel', 'vintrica-vignette-form' ),
-				'van'        => __( 'Dodávka', 'vintrica-vignette-form' ),
-				'trailer'    => __( 'Príves', 'vintrica-vignette-form' ),
-			)
-		);
+		return apply_filters( 'vintrica_vignette_vehicle_types', $this->catalog->get_vehicle_types() );
 	}
 
 	/**
-	 * Get country-specific validity options with server-side prices.
+	 * Get nested country validities grouped by vehicle type.
 	 *
-	 * @return array<string, array<string, array<string, mixed>>>
+	 * @return array<string, array<string, array<string, array<string, mixed>>>>
 	 */
 	public function get_country_validities() {
+		$catalog = $this->catalog->get_frontend_catalog();
+		$nested  = array();
+
+		foreach ( $catalog['validities'] as $country_code => $by_vehicle ) {
+			$nested[ $country_code ] = array();
+
+			foreach ( $by_vehicle as $vehicle_type => $items ) {
+				foreach ( $items as $item ) {
+					$nested[ $country_code ][ $item['code'] ] = array(
+						'label'        => $item['label'],
+						'price'        => (float) $item['price'],
+						'vehicle_type' => $vehicle_type,
+						'name'         => $item['name'],
+					);
+				}
+			}
+		}
+
 		/**
 		 * Filter country-specific validity options and prices.
 		 *
 		 * @param array<string, array<string, array<string, mixed>>> $validities Country => validity => config.
 		 */
-		return apply_filters(
-			'vintrica_vignette_country_validities',
-			array(
-				'at' => array(
-					'10d' => array(
-						'label' => __( '10 dní', 'vintrica-vignette-form' ),
-						'price' => 9.90,
-					),
-					'2m'  => array(
-						'label' => __( '2 mesiace', 'vintrica-vignette-form' ),
-						'price' => 28.90,
-					),
-					'1y'  => array(
-						'label' => __( '1 rok', 'vintrica-vignette-form' ),
-						'price' => 96.40,
-					),
-				),
-				'ch' => array(
-					'1d'  => array(
-						'label' => __( '1 deň', 'vintrica-vignette-form' ),
-						'price' => 8.30,
-					),
-					'7d'  => array(
-						'label' => __( '7 dní', 'vintrica-vignette-form' ),
-						'price' => 32.00,
-					),
-					'1y'  => array(
-						'label' => __( '1 rok', 'vintrica-vignette-form' ),
-						'price' => 40.00,
-					),
-				),
-				'cz' => array(
-					'10d' => array(
-						'label' => __( '10 dní', 'vintrica-vignette-form' ),
-						'price' => 12.00,
-					),
-					'1m'  => array(
-						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
-						'price' => 16.00,
-					),
-					'1y'  => array(
-						'label' => __( '1 rok', 'vintrica-vignette-form' ),
-						'price' => 150.00,
-					),
-				),
-				'hu' => array(
-					'10d' => array(
-						'label' => __( '10 dní', 'vintrica-vignette-form' ),
-						'price' => 15.00,
-					),
-					'1m'  => array(
-						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
-						'price' => 22.00,
-					),
-					'1y'  => array(
-						'label' => __( '1 rok', 'vintrica-vignette-form' ),
-						'price' => 155.00,
-					),
-				),
-				'si' => array(
-					'7d'  => array(
-						'label' => __( '7 dní', 'vintrica-vignette-form' ),
-						'price' => 16.00,
-					),
-					'1m'  => array(
-						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
-						'price' => 32.00,
-					),
-					'1y'  => array(
-						'label' => __( '1 rok', 'vintrica-vignette-form' ),
-						'price' => 110.00,
-					),
-				),
-				'sk' => array(
-					'10d' => array(
-						'label' => __( '10 dní', 'vintrica-vignette-form' ),
-						'price' => 12.00,
-					),
-					'1m'  => array(
-						'label' => __( '1 mesiac', 'vintrica-vignette-form' ),
-						'price' => 17.00,
-					),
-					'1y'  => array(
-						'label' => __( '1 rok', 'vintrica-vignette-form' ),
-						'price' => 60.00,
-					),
-				),
-			)
-		);
+		return apply_filters( 'vintrica_vignette_country_validities', $nested );
 	}
 
 	/**
-	 * Get price for a country and validity combination.
+	 * Get price for a country, vehicle type and validity combination.
 	 *
-	 * @param string $country   Country code.
-	 * @param string $validity  Validity code.
+	 * @param string $country       Country code.
+	 * @param string $validity      Validity code.
+	 * @param string $vehicle_type  Vehicle type code.
 	 * @return float|null
 	 */
-	public function get_vignette_price( $country, $validity ) {
-		$validities = $this->get_country_validities();
+	public function get_vignette_price( $country, $validity, $vehicle_type = '' ) {
+		if ( '' === $vehicle_type ) {
+			$match = $this->catalog->find_active_vignette( $country, 'car', $validity );
 
-		if ( ! isset( $validities[ $country ][ $validity ]['price'] ) ) {
+			if ( $match ) {
+				return round( (float) $match->price, 2 );
+			}
+
 			return null;
 		}
 
-		return (float) $validities[ $country ][ $validity ]['price'];
+		return $this->catalog->get_price( $country, $vehicle_type, $validity );
+	}
+
+	/**
+	 * Check whether an active catalog vignette exists.
+	 *
+	 * @param string $country       Country code.
+	 * @param string $vehicle_type  Vehicle type code.
+	 * @param string $validity      Validity code.
+	 * @return bool
+	 */
+	public function vignette_exists( $country, $vehicle_type, $validity ) {
+		return null !== $this->catalog->get_price( $country, $vehicle_type, $validity );
 	}
 
 	/**
@@ -224,19 +169,26 @@ class Vintrica_Pricing {
 	 * @return string
 	 */
 	public function get_vehicle_type_label( $code ) {
-		$types = $this->get_vehicle_types();
-
-		return isset( $types[ $code ] ) ? $types[ $code ] : $code;
+		return $this->catalog->get_vehicle_type_label( $code );
 	}
 
 	/**
-	 * Get localized validity label by country and validity code.
+	 * Get localized validity label by country, vehicle and validity code.
 	 *
-	 * @param string $country  Country code.
-	 * @param string $validity Validity code.
+	 * @param string $country      Country code.
+	 * @param string $validity     Validity code.
+	 * @param string $vehicle_type Vehicle type code.
 	 * @return string
 	 */
-	public function get_validity_label( $country, $validity ) {
+	public function get_validity_label( $country, $validity, $vehicle_type = '' ) {
+		if ( '' !== $vehicle_type ) {
+			$match = $this->catalog->find_active_vignette( $country, $vehicle_type, $validity );
+
+			if ( $match ) {
+				return $match->validity_label;
+			}
+		}
+
 		$validities = $this->get_country_validities();
 
 		if ( isset( $validities[ $country ][ $validity ]['label'] ) ) {
@@ -257,7 +209,11 @@ class Vintrica_Pricing {
 			/* translators: 1: country label, 2: validity label */
 			__( 'Diaľničná známka – %1$s (%2$s)', 'vintrica-vignette-form' ),
 			$this->get_country_label( $vignette['country'] ),
-			$this->get_validity_label( $vignette['country'], $vignette['vignette_validity'] )
+			$this->get_validity_label(
+				$vignette['country'],
+				$vignette['vignette_validity'],
+				isset( $vignette['vehicle_type'] ) ? $vignette['vehicle_type'] : ''
+			)
 		);
 	}
 
@@ -267,43 +223,17 @@ class Vintrica_Pricing {
 	 * @return array<string, mixed>
 	 */
 	public function get_frontend_config() {
-		$countries  = $this->get_countries();
-		$validities = $this->get_country_validities();
-		$config     = array(
-			'currency'     => $this->get_currency(),
-			'serviceFee'   => $this->get_service_fee(),
-			'countries'    => array(),
-			'vehicleTypes' => array(),
-			'validities'   => array(),
-		);
+		$config = $this->catalog->get_frontend_catalog();
 
-		foreach ( $countries as $code => $label ) {
-			$config['countries'][] = array(
-				'code'  => $code,
-				'label' => $label,
-			);
-		}
+		$config['currency']   = $this->get_currency();
+		$config['serviceFee'] = $this->get_service_fee();
 
-		foreach ( $this->get_vehicle_types() as $code => $label ) {
-			$config['vehicleTypes'][] = array(
-				'code'  => $code,
-				'label' => $label,
-			);
-		}
-
-		foreach ( $validities as $country_code => $country_validities ) {
-			$config['validities'][ $country_code ] = array();
-
-			foreach ( $country_validities as $validity_code => $validity_config ) {
-				$config['validities'][ $country_code ][] = array(
-					'code'  => $validity_code,
-					'label' => $validity_config['label'],
-					'price' => (float) $validity_config['price'],
-				);
-			}
-		}
-
-		return $config;
+		/**
+		 * Filter frontend pricing configuration.
+		 *
+		 * @param array<string, mixed> $config Frontend config.
+		 */
+		return apply_filters( 'vintrica_vignette_frontend_config', $config );
 	}
 
 	/**
@@ -318,7 +248,8 @@ class Vintrica_Pricing {
 		foreach ( $vignettes as $vignette ) {
 			$price = $this->get_vignette_price(
 				$vignette['country'],
-				$vignette['vignette_validity']
+				$vignette['vignette_validity'],
+				$vignette['vehicle_type']
 			);
 
 			if ( null !== $price ) {

@@ -35,8 +35,13 @@
 		return getLabelFromList(config.vehicleTypes, code);
 	}
 
-	function getValidityLabel(country, validityCode) {
-		var options = config.validities[country] || [];
+	function getCatalogOptions(country, vehicleType) {
+		var byCountry = config.validities[country] || {};
+		return byCountry[vehicleType] || [];
+	}
+
+	function getValidityLabel(country, vehicleType, validityCode) {
+		var options = getCatalogOptions(country, vehicleType);
 		var i;
 
 		for (i = 0; i < options.length; i += 1) {
@@ -48,8 +53,8 @@
 		return validityCode;
 	}
 
-	function getValidityPrice(country, validityCode) {
-		var options = config.validities[country] || [];
+	function getValidityPrice(country, vehicleType, validityCode) {
+		var options = getCatalogOptions(country, vehicleType);
 		var i;
 
 		for (i = 0; i < options.length; i += 1) {
@@ -154,6 +159,8 @@
 
 		this.bindEvents();
 		this.initAllChoices();
+		this.populateVehicleTypes('');
+		this.populateValidities('', '');
 		this.loadFromStorage();
 		this.renderSummary();
 		this.updateStepIndicators();
@@ -175,7 +182,14 @@
 		var self = this;
 
 		this.fields.country.addEventListener('change', function () {
-			self.populateValidities(self.fields.country.value);
+			self.populateVehicleTypes(self.fields.country.value);
+			self.populateValidities(self.fields.country.value, '');
+			self.setSelectValue(self.fields.vehicle_type, '');
+			self.setSelectValue(self.fields.vignette_validity, '');
+		});
+
+		this.fields.vehicle_type.addEventListener('change', function () {
+			self.populateValidities(self.fields.country.value, self.fields.vehicle_type.value);
 			self.setSelectValue(self.fields.vignette_validity, '');
 		});
 
@@ -582,16 +596,60 @@
 		}
 	};
 
-	VintricaBuilder.prototype.populateValidities = function (countryCode) {
-		var select = this.fields.vignette_validity;
-		var options = config.validities[countryCode] || [];
+	VintricaBuilder.prototype.populateVehicleTypes = function (countryCode) {
+		var select = this.fields.vehicle_type;
+		var codes = config.vehicleTypesByCountry[countryCode] || [];
 		var choices = [
 			{
 				value: '',
-				label: countryCode ? strings.selectValidity : strings.selectCountryFirst
+				label: countryCode ? strings.selectVehicleType : strings.selectCountryFirst
 			}
 		];
-		var disabled = !countryCode || options.length === 0;
+		var disabled = !countryCode || codes.length === 0;
+		var i;
+		var option;
+
+		for (i = 0; i < codes.length; i += 1) {
+			choices.push({
+				value: codes[i],
+				label: getVehicleLabel(codes[i])
+			});
+		}
+
+		if (select._vintricaChoices) {
+			select._vintricaChoices.clearStore();
+			select._vintricaChoices.setChoices(choices, 'value', 'label', true);
+			this.setSelectDisabled(select, disabled);
+			return;
+		}
+
+		select.innerHTML = '';
+
+		option = document.createElement('option');
+		option.value = '';
+		option.textContent = countryCode ? strings.selectVehicleType : strings.selectCountryFirst;
+		select.appendChild(option);
+
+		for (i = 0; i < codes.length; i += 1) {
+			option = document.createElement('option');
+			option.value = codes[i];
+			option.textContent = getVehicleLabel(codes[i]);
+			select.appendChild(option);
+		}
+
+		this.setSelectDisabled(select, disabled);
+	};
+
+	VintricaBuilder.prototype.populateValidities = function (countryCode, vehicleType) {
+		var select = this.fields.vignette_validity;
+		var options = getCatalogOptions(countryCode, vehicleType);
+		var choices = [
+			{
+				value: '',
+				label: !countryCode ? strings.selectCountryFirst : (vehicleType ? strings.selectValidity : strings.selectVehicleFirst)
+			}
+		];
+		var disabled = !countryCode || !vehicleType || options.length === 0;
 		var i;
 		var option;
 
@@ -613,7 +671,7 @@
 
 		option = document.createElement('option');
 		option.value = '';
-		option.textContent = countryCode ? strings.selectValidity : strings.selectCountryFirst;
+		option.textContent = !countryCode ? strings.selectCountryFirst : (vehicleType ? strings.selectValidity : strings.selectVehicleFirst);
 		select.appendChild(option);
 
 		for (i = 0; i < options.length; i += 1) {
@@ -639,8 +697,9 @@
 
 	VintricaBuilder.prototype.setFieldValues = function (values) {
 		this.setSelectValue(this.fields.country, values.country || '');
-		this.populateValidities(values.country || '');
+		this.populateVehicleTypes(values.country || '');
 		this.setSelectValue(this.fields.vehicle_type, values.vehicle_type || '');
+		this.populateValidities(values.country || '', values.vehicle_type || '');
 		this.setSelectValue(this.fields.vignette_validity, values.vignette_validity || '');
 		this.fields.start_date.value = values.start_date || '';
 		this.fields.license_plate.value = values.license_plate || '';
@@ -656,7 +715,8 @@
 			license_plate: '',
 			registration_country: ''
 		});
-		this.populateValidities('');
+		this.populateVehicleTypes('');
+		this.populateValidities('', '');
 	};
 
 	VintricaBuilder.prototype.showFormError = function (message) {
@@ -711,11 +771,11 @@
 			}
 		}
 
-		if (!config.validities[values.country]) {
+		if (!getCatalogOptions(values.country, values.vehicle_type).length) {
 			return false;
 		}
 
-		return getValidityPrice(values.country, values.vignette_validity) > 0;
+		return getValidityPrice(values.country, values.vehicle_type, values.vignette_validity) > 0;
 	};
 
 	VintricaBuilder.prototype.validateContinue = function () {
@@ -889,7 +949,7 @@
 
 		for (i = 0; i < this.vignettes.length; i += 1) {
 			vignette = this.vignettes[i];
-			subtotal += getValidityPrice(vignette.country, vignette.vignette_validity);
+			subtotal += getValidityPrice(vignette.country, vignette.vehicle_type, vignette.vignette_validity);
 		}
 
 		return {
@@ -922,7 +982,7 @@
 
 		for (i = 0; i < this.vignettes.length; i += 1) {
 			vignette = this.vignettes[i];
-			price = getValidityPrice(vignette.country, vignette.vignette_validity);
+			price = getValidityPrice(vignette.country, vignette.vehicle_type, vignette.vignette_validity);
 
 			item = document.createElement('li');
 			item.className = 'vintrica-summary-item';
@@ -940,7 +1000,7 @@
 
 			title = document.createElement('div');
 			title.className = 'vintrica-summary-item__title';
-			title.textContent = getCountryLabel(vignette.country) + ' · ' + getValidityLabel(vignette.country, vignette.vignette_validity);
+			title.textContent = getCountryLabel(vignette.country) + ' · ' + getValidityLabel(vignette.country, vignette.vehicle_type, vignette.vignette_validity);
 
 			priceEl = document.createElement('div');
 			priceEl.className = 'vintrica-summary-item__price';
@@ -1049,14 +1109,14 @@
 
 			title = document.createElement('h4');
 			title.className = 'vintrica-review-vignette-card__title';
-			title.textContent = getCountryLabel(vignette.country) + ' · ' + getValidityLabel(vignette.country, vignette.vignette_validity);
+			title.textContent = getCountryLabel(vignette.country) + ' · ' + getValidityLabel(vignette.country, vignette.vehicle_type, vignette.vignette_validity);
 
 			headerMain.appendChild(badge);
 			headerMain.appendChild(title);
 
 			priceEl = document.createElement('div');
 			priceEl.className = 'vintrica-review-vignette-card__price';
-			priceEl.textContent = formatPrice(getValidityPrice(vignette.country, vignette.vignette_validity));
+			priceEl.textContent = formatPrice(getValidityPrice(vignette.country, vignette.vehicle_type, vignette.vignette_validity));
 
 			header.appendChild(headerIcon);
 			header.appendChild(headerMain);

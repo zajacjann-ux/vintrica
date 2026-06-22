@@ -28,6 +28,18 @@ class Vintrica_Admin {
 	const STRIPE_SLUG = 'vintrica-form-stripe';
 
 	/**
+	 * Catalog submenu slug.
+	 */
+	const CATALOG_SLUG = 'vintrica-form-catalog';
+
+	/**
+	 * Admin catalog handler.
+	 *
+	 * @var Vintrica_Admin_Catalog|null
+	 */
+	private $catalog_admin;
+
+	/**
 	 * Nonce action for admin order actions.
 	 */
 	const ORDER_ACTION_NONCE = 'vintrica_admin_order_action';
@@ -44,8 +56,12 @@ class Vintrica_Admin {
 
 	/**
 	 * Constructor.
+	 *
+	 * @param Vintrica_Admin_Catalog|null $catalog_admin Catalog admin handler.
 	 */
-	public function __construct() {
+	public function __construct( Vintrica_Admin_Catalog $catalog_admin = null ) {
+		$this->catalog_admin = $catalog_admin;
+
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_actions' ) );
@@ -74,6 +90,15 @@ class Vintrica_Admin {
 			'manage_options',
 			self::ORDERS_SLUG,
 			array( $this, 'render_orders_page' )
+		);
+
+		add_submenu_page(
+			self::MENU_SLUG,
+			__( 'Cenník známok', 'vintrica-vignette-form' ),
+			__( 'Cenník známok', 'vintrica-vignette-form' ),
+			'manage_options',
+			self::CATALOG_SLUG,
+			array( $this, 'render_catalog_page' )
 		);
 
 		add_submenu_page(
@@ -432,12 +457,13 @@ class Vintrica_Admin {
 						<?php
 						$country_code = $vignette['country'] ?? '';
 						$validity_code = $vignette['vignette_validity'] ?? '';
-						$price = $pricing->get_vignette_price( $country_code, $validity_code );
-						$price = null !== $price ? $price : 0;
+						$vehicle_type  = $vignette['vehicle_type'] ?? '';
+						$price         = $pricing->get_vignette_price( $country_code, $validity_code, $vehicle_type );
+						$price         = null !== $price ? $price : 0;
 						?>
 						<tr>
 							<td><?php echo esc_html( $countries[ $country_code ] ?? $country_code ); ?></td>
-							<td><?php echo esc_html( $pricing->get_validity_label( $country_code, $validity_code ) ); ?></td>
+							<td><?php echo esc_html( $pricing->get_validity_label( $country_code, $validity_code, $vehicle_type ) ); ?></td>
 							<td><?php echo esc_html( $vehicles[ $vignette['vehicle_type'] ?? '' ] ?? ( $vignette['vehicle_type'] ?? '' ) ); ?></td>
 							<td><?php echo esc_html( $vignette['license_plate'] ?? '' ); ?></td>
 							<td><?php echo esc_html( $countries[ $vignette['registration_country'] ?? '' ] ?? ( $vignette['registration_country'] ?? '' ) ); ?></td>
@@ -478,6 +504,17 @@ class Vintrica_Admin {
 			</form>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Render catalog admin page.
+	 *
+	 * @return void
+	 */
+	public function render_catalog_page() {
+		if ( $this->catalog_admin ) {
+			$this->catalog_admin->render_page();
+		}
 	}
 
 	/**

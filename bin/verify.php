@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.4.1' );
+		define( 'VINTRICA_VERSION', '1.5.0' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -485,7 +485,45 @@ function vintrica_bootstrap_wordpress_stubs() {
 			}
 
 			public function get_results( $query ) {
+				if ( false !== strpos( $query, 'vintrica_catalog_countries' ) && false === strpos( $query, 'vintrica_catalog_vignettes' ) ) {
+					return array(
+						(object) array(
+							'id'         => 1,
+							'code'       => 'sk',
+							'name'       => 'Slovensko',
+							'active'     => 1,
+							'sort_order' => 60,
+						),
+					);
+				}
+
+				if ( false !== strpos( $query, 'vintrica_catalog_vignettes' ) ) {
+					return array(
+						(object) array(
+							'id'             => 1,
+							'country_id'     => 1,
+							'vehicle_type'   => 'car',
+							'vignette_code'  => '1d',
+							'name'           => '1 dňová',
+							'validity_label' => '1 dňová',
+							'price'          => '8.90',
+							'active'         => 1,
+							'sort_order'     => 0,
+							'country_code'   => 'sk',
+							'country_name'   => 'Slovensko',
+						),
+					);
+				}
+
 				return array();
+			}
+
+			public function get_var( $query ) {
+				if ( false !== strpos( $query, 'COUNT(*)' ) && false !== strpos( $query, 'vintrica_catalog_countries' ) ) {
+					return '1';
+				}
+
+				return '0';
 			}
 
 			public function get_charset_collate() {
@@ -516,12 +554,14 @@ $required_files = array(
 	'vintrica-vignette-form.php',
 	'index.php',
 	'includes/index.php',
+	'includes/class-vintrica-catalog.php',
 	'includes/class-vintrica-pricing.php',
 	'includes/class-vintrica-security.php',
 	'includes/class-vintrica-orders.php',
 	'includes/class-vintrica-stripe.php',
 	'includes/class-vintrica-checkout.php',
 	'includes/class-vintrica-rest.php',
+	'includes/class-vintrica-admin-catalog.php',
 	'includes/class-vintrica-admin.php',
 	'includes/class-vintrica-frontend.php',
 	'includes/class-vintrica-activator.php',

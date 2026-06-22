@@ -3,7 +3,7 @@
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.4.3
+ * Version:           1.5.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            VINTRICA
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.4.3' );
+define( 'VINTRICA_VERSION', '1.5.0' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -35,6 +35,13 @@ final class Vintrica_Vignette_Form {
 	 * @var Vintrica_Vignette_Form|null
 	 */
 	private static $instance = null;
+
+	/**
+	 * Catalog handler.
+	 *
+	 * @var Vintrica_Catalog
+	 */
+	public $catalog;
 
 	/**
 	 * Pricing handler.
@@ -122,12 +129,14 @@ final class Vintrica_Vignette_Form {
 	private function load_dependencies() {
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-activator.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-deactivator.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-catalog.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-pricing.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-security.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-orders.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-stripe.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-checkout.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-rest.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-admin-catalog.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-admin.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-frontend.php';
 	}
@@ -138,13 +147,16 @@ final class Vintrica_Vignette_Form {
 	 * @return void
 	 */
 	private function init_components() {
-		$this->pricing  = new Vintrica_Pricing();
+		$this->catalog = new Vintrica_Catalog();
+		$this->pricing = new Vintrica_Pricing( $this->catalog );
 		$this->security = new Vintrica_Security( $this->pricing );
 		$this->orders   = new Vintrica_Orders();
 		$this->stripe   = new Vintrica_Stripe();
 		$this->checkout = new Vintrica_Checkout( $this->security, $this->pricing, $this->orders, $this->stripe );
 		$this->rest     = new Vintrica_Rest( $this->checkout, $this->stripe );
-		$this->admin    = new Vintrica_Admin();
+
+		$catalog_admin  = new Vintrica_Admin_Catalog( $this->catalog );
+		$this->admin    = new Vintrica_Admin( $catalog_admin );
 		$this->frontend = new Vintrica_Frontend( $this->security, $this->pricing, $this->checkout );
 	}
 
@@ -162,15 +174,22 @@ final class Vintrica_Vignette_Form {
 	}
 
 	/**
-	 * Ensure orders table exists after updates.
+	 * Ensure database tables exist after updates.
 	 *
 	 * @return void
 	 */
 	public function maybe_upgrade_database() {
-		$installed = get_option( Vintrica_Orders::DB_VERSION_OPTION );
+		$orders_installed = get_option( Vintrica_Orders::DB_VERSION_OPTION );
 
-		if ( Vintrica_Orders::DB_VERSION !== $installed ) {
+		if ( Vintrica_Orders::DB_VERSION !== $orders_installed ) {
 			$this->orders->create_table();
+		}
+
+		$catalog_installed = get_option( Vintrica_Catalog::DB_VERSION_OPTION );
+
+		if ( Vintrica_Catalog::DB_VERSION !== $catalog_installed ) {
+			$this->catalog->create_tables();
+			$this->catalog->maybe_seed_defaults();
 		}
 	}
 

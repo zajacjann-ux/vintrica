@@ -98,6 +98,13 @@
 	letter-spacing: 0.01em;
 }
 
+.vintrica-field__hint {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.45;
+	color: var(--vintrica-text-muted);
+}
+
 .vintrica-control {
 	position: relative;
 }

@@ -38,6 +38,8 @@ class Vintrica_Activator {
 
 		if ( function_exists( 'vintrica_vignette_form' ) ) {
 			vintrica_vignette_form()->orders->create_table();
+			vintrica_vignette_form()->catalog->create_tables();
+			vintrica_vignette_form()->catalog->maybe_seed_defaults();
 		}
 
 		flush_rewrite_rules();

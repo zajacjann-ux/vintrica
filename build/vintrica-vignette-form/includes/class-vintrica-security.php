@@ -244,7 +244,6 @@ class Vintrica_Security {
 
 		$countries     = $this->pricing->get_countries();
 		$vehicle_types = $this->pricing->get_vehicle_types();
-		$validities    = $this->pricing->get_country_validities();
 		$sanitized     = array();
 
 		foreach ( $decoded as $index => $item ) {
@@ -273,8 +272,8 @@ class Vintrica_Security {
 				return new WP_Error( 'vintrica_invalid_vehicle', __( 'Neplatný typ vozidla.', 'vintrica-vignette-form' ) );
 			}
 
-			if ( ! isset( $validities[ $vignette['country'] ][ $vignette['vignette_validity'] ] ) ) {
-				return new WP_Error( 'vintrica_invalid_validity', __( 'Neplatná platnosť známky pre zvolenú krajinu.', 'vintrica-vignette-form' ) );
+			if ( ! $this->pricing->vignette_exists( $vignette['country'], $vignette['vehicle_type'], $vignette['vignette_validity'] ) ) {
+				return new WP_Error( 'vintrica_invalid_validity', __( 'Neplatná platnosť známky pre zvolenú krajinu a typ vozidla.', 'vintrica-vignette-form' ) );
 			}
 
 			if ( ! isset( $countries[ $vignette['registration_country'] ] ) ) {
