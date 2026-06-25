@@ -35,6 +35,16 @@
 	-moz-osx-font-smoothing: grayscale;
 }
 
+.vintrica-hp-field {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	opacity: 0;
+	pointer-events: none;
+}
+
 .vintrica-vignette-form {
 	display: grid;
 	gap: 1.25rem;

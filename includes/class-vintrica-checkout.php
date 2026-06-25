@@ -74,7 +74,30 @@ class Vintrica_Checkout {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified above with check_ajax_referer().
 		$post_data = wp_unslash( $_POST );
-		$result    = $this->process_submission( is_array( $post_data ) ? $post_data : array() );
+		$post_data = is_array( $post_data ) ? $post_data : array();
+
+		if ( $this->security->is_honeypot_triggered( $post_data ) ) {
+			wp_send_json_success(
+				array(
+					'checkout_url' => '',
+					'order_number' => '',
+				)
+			);
+		}
+
+		$rate_limit = $this->security->check_checkout_rate_limit();
+
+		if ( is_wp_error( $rate_limit ) ) {
+			wp_send_json_error(
+				array(
+					'message' => $rate_limit->get_error_message(),
+				)
+			);
+		}
+
+		$this->security->record_checkout_attempt();
+
+		$result = $this->process_submission( $post_data );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error(
@@ -99,6 +122,12 @@ class Vintrica_Checkout {
 	 * @return array{checkout_url: string, order_number: string}|WP_Error
 	 */
 	public function process_submission( array $post_data ) {
+		$price_check = $this->security->reject_frontend_price_fields( $post_data );
+
+		if ( is_wp_error( $price_check ) ) {
+			return $price_check;
+		}
+
 		if ( empty( $post_data['vintrica_vignettes'] ) ) {
 			return new WP_Error(
 				'vintrica_missing_vignettes',
@@ -119,6 +148,10 @@ class Vintrica_Checkout {
 		}
 
 		$totals = $this->pricing->calculate_totals( $vignettes );
+
+		if ( is_wp_error( $totals ) ) {
+			return $totals;
+		}
 
 		$order_id = $this->orders->create_order(
 			array(
@@ -144,6 +177,13 @@ class Vintrica_Checkout {
 			);
 		}
 
+		/**
+		 * Fires immediately after a new VINTRICA order is stored.
+		 *
+		 * @param object $order Order row.
+		 */
+		do_action( 'vintrica_order_created', $order );
+
 		$stripe_session = $this->stripe->create_checkout_session( $order, $totals );
 
 		if ( is_wp_error( $stripe_session ) ) {
@@ -155,14 +195,6 @@ class Vintrica_Checkout {
 			$stripe_session['session_id'],
 			$stripe_session['payload']
 		);
-
-		/**
-		 * Fires after a VINTRICA order is stored and Stripe session is created.
-		 *
-		 * @param object $order          Order row.
-		 * @param array  $stripe_session Stripe session result.
-		 */
-		do_action( 'vintrica_order_created', $order, $stripe_session );
 
 		return array(
 			'checkout_url' => $stripe_session['checkout_url'],

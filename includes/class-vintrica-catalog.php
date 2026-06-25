@@ -250,15 +250,21 @@ class Vintrica_Catalog {
 		global $wpdb;
 
 		$table = $this->get_countries_table_name();
-		$sql   = "SELECT * FROM {$table}";
 
 		if ( $active_only ) {
-			$sql .= ' WHERE active = 1';
+			return $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$table} WHERE active = %d ORDER BY sort_order ASC, name ASC",
+					1
+				)
+			);
 		}
 
-		$sql .= ' ORDER BY sort_order ASC, name ASC';
-
-		return $wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} ORDER BY sort_order ASC, name ASC"
+			)
+		);
 	}
 
 	/**

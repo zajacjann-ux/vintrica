@@ -334,6 +334,10 @@ class Vintrica_Frontend {
 			define( 'DONOTCACHEPAGE', true );
 		}
 
+		if ( ! headers_sent() ) {
+			nocache_headers();
+		}
+
 		$storage_key  = $this->get_storage_key();
 		$order_number = $this->get_confirmed_order_number();
 
@@ -376,6 +380,7 @@ class Vintrica_Frontend {
 			<?php else : ?>
 				<form class="vintrica-vignette-form" method="post" action="<?php echo esc_url( get_permalink() ); ?>" novalidate>
 					<?php $this->security->render_nonce_field(); ?>
+					<?php $this->security->render_honeypot_field(); ?>
 
 					<input type="hidden" name="<?php echo esc_attr( self::VIGNETTES_FIELD ); ?>" id="vintrica-vignettes-data" value="" />
 

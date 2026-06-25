@@ -28,6 +28,21 @@ class Vintrica_Security {
 	const CHECKOUT_NONCE_ACTION = 'vintrica_checkout_nonce';
 
 	/**
+	 * Honeypot field name (must remain empty for legitimate submissions).
+	 */
+	const HONEYPOT_FIELD = 'vintrica_hp_website';
+
+	/**
+	 * Maximum checkout session attempts per IP within the rate-limit window.
+	 */
+	const CHECKOUT_RATE_LIMIT_MAX = 5;
+
+	/**
+	 * Rate-limit window in seconds (10 minutes).
+	 */
+	const CHECKOUT_RATE_LIMIT_WINDOW = 600;
+
+	/**
 	 * Single vignette field keys.
 	 *
 	 * @var string[]
@@ -64,6 +79,110 @@ class Vintrica_Security {
 	 */
 	public function render_nonce_field() {
 		wp_nonce_field( self::FORM_NONCE_ACTION, self::FORM_NONCE_NAME );
+	}
+
+	/**
+	 * Render a hidden honeypot field for spam bots.
+	 *
+	 * @return void
+	 */
+	public function render_honeypot_field() {
+		printf(
+			'<div class="vintrica-hp-field" aria-hidden="true"><label for="vintrica-hp-website">%1$s</label><input type="text" id="vintrica-hp-website" name="%2$s" value="" tabindex="-1" autocomplete="off" /></div>',
+			esc_html__( 'Webová stránka', 'vintrica-vignette-form' ),
+			esc_attr( self::HONEYPOT_FIELD )
+		);
+	}
+
+	/**
+	 * Detect whether the honeypot field was filled by a bot.
+	 *
+	 * @param array $post_data POST data.
+	 * @return bool
+	 */
+	public function is_honeypot_triggered( array $post_data ) {
+		if ( ! isset( $post_data[ self::HONEYPOT_FIELD ] ) ) {
+			return false;
+		}
+
+		return '' !== trim( sanitize_text_field( wp_unslash( $post_data[ self::HONEYPOT_FIELD ] ) ) );
+	}
+
+	/**
+	 * Reject submissions that include client-side price fields.
+	 *
+	 * @param array $post_data POST data.
+	 * @return true|WP_Error
+	 */
+	public function reject_frontend_price_fields( array $post_data ) {
+		$forbidden_keys = array(
+			'vintrica_total',
+			'vintrica_subtotal',
+			'vintrica_price',
+			'total',
+			'subtotal',
+			'price',
+			'amount',
+		);
+
+		foreach ( $forbidden_keys as $key ) {
+			if ( isset( $post_data[ $key ] ) && '' !== trim( (string) wp_unslash( $post_data[ $key ] ) ) ) {
+				return new WP_Error(
+					'vintrica_frontend_price_rejected',
+					__( 'Neplatné údaje objednávky.', 'vintrica-vignette-form' )
+				);
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get the client IP address for rate limiting.
+	 *
+	 * @return string
+	 */
+	public function get_client_ip() {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return '0.0.0.0';
+		}
+
+		return $ip;
+	}
+
+	/**
+	 * Check checkout rate limit for the current IP.
+	 *
+	 * @return true|WP_Error
+	 */
+	public function check_checkout_rate_limit() {
+		$ip       = $this->get_client_ip();
+		$key      = 'vintrica_checkout_rl_' . md5( $ip );
+		$attempts = (int) get_transient( $key );
+
+		if ( $attempts >= self::CHECKOUT_RATE_LIMIT_MAX ) {
+			return new WP_Error(
+				'vintrica_checkout_rate_limit',
+				__( 'Prekročili ste limit pokusov o platbu. Skúste to prosím znova o 10 minút.', 'vintrica-vignette-form' )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Record a checkout attempt for rate limiting.
+	 *
+	 * @return void
+	 */
+	public function record_checkout_attempt() {
+		$ip       = $this->get_client_ip();
+		$key      = 'vintrica_checkout_rl_' . md5( $ip );
+		$attempts = (int) get_transient( $key );
+
+		set_transient( $key, $attempts + 1, self::CHECKOUT_RATE_LIMIT_WINDOW );
 	}
 
 	/**

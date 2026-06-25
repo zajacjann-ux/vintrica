@@ -111,13 +111,7 @@ class Vintrica_Pricing {
 	 * @return float|null
 	 */
 	public function get_vignette_price( $country, $validity, $vehicle_type = '' ) {
-		if ( '' === $vehicle_type ) {
-			$match = $this->catalog->find_active_vignette( $country, 'car', $validity );
-
-			if ( $match ) {
-				return round( (float) $match->price, 2 );
-			}
-
+		if ( '' === sanitize_key( $vehicle_type ) ) {
 			return null;
 		}
 
@@ -225,21 +219,46 @@ class Vintrica_Pricing {
 	 * Calculate order totals from validated vignettes.
 	 *
 	 * @param array<int, array<string, string>> $vignettes Validated vignettes.
-	 * @return array<string, float|int>
+	 * @return array<string, float|int>|WP_Error
 	 */
 	public function calculate_totals( array $vignettes ) {
 		$subtotal = 0.0;
 
-		foreach ( $vignettes as $vignette ) {
+		foreach ( $vignettes as $index => $vignette ) {
+			$vehicle_type = isset( $vignette['vehicle_type'] ) ? sanitize_key( $vignette['vehicle_type'] ) : '';
+
+			if ( '' === $vehicle_type ) {
+				return new WP_Error(
+					'vintrica_missing_vehicle_type',
+					__( 'Neplatný typ vozidla.', 'vintrica-vignette-form' )
+				);
+			}
+
+			if ( ! $this->vignette_exists( $vignette['country'], $vehicle_type, $vignette['vignette_validity'] ) ) {
+				return new WP_Error(
+					'vintrica_invalid_combination',
+					__( 'Neplatná kombinácia krajiny, typu vozidla a platnosti známky.', 'vintrica-vignette-form' )
+				);
+			}
+
 			$price = $this->get_vignette_price(
 				$vignette['country'],
 				$vignette['vignette_validity'],
-				$vignette['vehicle_type']
+				$vehicle_type
 			);
 
-			if ( null !== $price ) {
-				$subtotal += $price;
+			if ( null === $price ) {
+				return new WP_Error(
+					'vintrica_invalid_combination',
+					sprintf(
+						/* translators: %d: vignette index */
+						__( 'Neplatná kombinácia ceny pre známku na pozícii %d.', 'vintrica-vignette-form' ),
+						(int) $index + 1
+					)
+				);
 			}
+
+			$subtotal += $price;
 		}
 
 		$subtotal = round( $subtotal, 2 );

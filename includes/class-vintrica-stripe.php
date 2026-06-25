@@ -75,6 +75,59 @@ class Vintrica_Stripe {
 	}
 
 	/**
+	 * Detect webhook secret prefix for diagnostics.
+	 *
+	 * @return string One of: whsec, missing, invalid.
+	 */
+	public function get_webhook_secret_prefix() {
+		$secret = trim( $this->get_webhook_secret() );
+
+		if ( '' === $secret ) {
+			return 'missing';
+		}
+
+		if ( 0 === strpos( $secret, 'whsec_' ) ) {
+			return 'whsec';
+		}
+
+		return 'invalid';
+	}
+
+	/**
+	 * Get a masked display value for the secret key (prefix only).
+	 *
+	 * @return string
+	 */
+	public function get_masked_secret_key() {
+		$prefix = $this->get_secret_key_prefix();
+
+		if ( 'missing' === $prefix ) {
+			return '';
+		}
+
+		return $prefix . '_••••••••';
+	}
+
+	/**
+	 * Get a masked display value for the webhook secret (prefix only).
+	 *
+	 * @return string
+	 */
+	public function get_masked_webhook_secret() {
+		$prefix = $this->get_webhook_secret_prefix();
+
+		if ( 'missing' === $prefix ) {
+			return '';
+		}
+
+		if ( 'invalid' === $prefix ) {
+			return 'invalid_••••••••';
+		}
+
+		return 'whsec_••••••••';
+	}
+
+	/**
 	 * Check whether Stripe test mode is enabled.
 	 *
 	 * @return bool
@@ -269,6 +322,7 @@ class Vintrica_Stripe {
 			'has_publishable_key'       => '' !== trim( $this->get_publishable_key() ),
 			'has_webhook_secret'        => '' !== trim( $this->get_webhook_secret() ),
 			'key_prefix'                => $this->get_secret_key_prefix(),
+			'webhook_prefix'            => $this->get_webhook_secret_prefix(),
 			'success_redirect_base_url' => $this->get_success_redirect_base_url(),
 			'cancel_redirect_base_url'  => $this->get_cancel_redirect_base_url(),
 			'success_url'               => $this->get_success_url( $sample_order_id, $sample_token ),
@@ -347,9 +401,26 @@ class Vintrica_Stripe {
 	 * @return true|WP_Error
 	 */
 	public function save_settings( array $settings ) {
-		update_option( self::OPTION_SECRET_KEY, sanitize_text_field( $settings['secret_key'] ?? '' ) );
-		update_option( self::OPTION_PUBLISHABLE_KEY, sanitize_text_field( $settings['publishable_key'] ?? '' ) );
-		update_option( self::OPTION_WEBHOOK_SECRET, sanitize_text_field( $settings['webhook_secret'] ?? '' ) );
+		if ( isset( $settings['secret_key'] ) ) {
+			$secret_key = sanitize_text_field( $settings['secret_key'] );
+
+			if ( '' !== $secret_key ) {
+				update_option( self::OPTION_SECRET_KEY, $secret_key );
+			}
+		}
+
+		if ( isset( $settings['publishable_key'] ) ) {
+			update_option( self::OPTION_PUBLISHABLE_KEY, sanitize_text_field( $settings['publishable_key'] ) );
+		}
+
+		if ( isset( $settings['webhook_secret'] ) ) {
+			$webhook_secret = sanitize_text_field( $settings['webhook_secret'] );
+
+			if ( '' !== $webhook_secret ) {
+				update_option( self::OPTION_WEBHOOK_SECRET, $webhook_secret );
+			}
+		}
+
 		update_option( self::OPTION_TEST_MODE, ! empty( $settings['test_mode'] ) ? 1 : 0 );
 
 		if ( array_key_exists( 'success_redirect_url', $settings ) ) {
@@ -839,11 +910,61 @@ class Vintrica_Stripe {
 	 * @return void
 	 */
 	private function write_log( $message, $context = '' ) {
+		$context = $this->sanitize_log_context( $context );
+
 		if ( is_array( $context ) || is_object( $context ) ) {
 			$context = wp_json_encode( $context );
 		}
 
 		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		error_log( '[VINTRICA Stripe] ' . $message . ( $context ? ': ' . $context : '' ) );
+	}
+
+	/**
+	 * Redact Stripe secrets from log context.
+	 *
+	 * @param mixed $context Log context.
+	 * @return mixed
+	 */
+	private function sanitize_log_context( $context ) {
+		if ( is_string( $context ) ) {
+			return $this->redact_secrets_from_string( $context );
+		}
+
+		if ( ! is_array( $context ) ) {
+			return $context;
+		}
+
+		$sanitized = array();
+
+		foreach ( $context as $key => $value ) {
+			if ( is_string( $value ) ) {
+				$sanitized[ $key ] = $this->redact_secrets_from_string( $value );
+				continue;
+			}
+
+			if ( is_array( $value ) ) {
+				$sanitized[ $key ] = $this->sanitize_log_context( $value );
+				continue;
+			}
+
+			$sanitized[ $key ] = $value;
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Replace full Stripe key values with prefix-only placeholders.
+	 *
+	 * @param string $value Raw string.
+	 * @return string
+	 */
+	private function redact_secrets_from_string( $value ) {
+		$value = preg_replace( '/sk_(test|live)_[A-Za-z0-9]+/', 'sk_$1_***', $value );
+		$value = preg_replace( '/whsec_[A-Za-z0-9]+/', 'whsec_***', $value );
+		$value = preg_replace( '/Bearer\s+sk_(test|live)_[A-Za-z0-9]+/', 'Bearer sk_$1_***', $value );
+
+		return is_string( $value ) ? $value : '';
 	}
 }

@@ -43,6 +43,11 @@ class Vintrica_Admin {
 	const SETTINGS_NONCE = 'vintrica_admin_settings';
 
 	/**
+	 * Nonce action for notification test email.
+	 */
+	const NOTIFICATION_TEST_NONCE = 'vintrica_admin_notification_test';
+
+	/**
 	 * Admin catalog handler.
 	 *
 	 * @var Vintrica_Admin_Catalog|null
@@ -159,6 +164,11 @@ class Vintrica_Admin {
 			return;
 		}
 
+		if ( isset( $_POST['vintrica_notification_test_submit'] ) ) {
+			$this->handle_notification_test();
+			return;
+		}
+
 		if ( isset( $_POST['vintrica_settings_submit'] ) ) {
 			$this->handle_settings_save();
 			return;
@@ -218,6 +228,42 @@ class Vintrica_Admin {
 		if ( '' !== $key_warning ) {
 			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_key_warning', $key_warning, 'warning' );
 		}
+	}
+
+	/**
+	 * Send a test notification email from settings.
+	 *
+	 * @return void
+	 */
+	private function handle_notification_test() {
+		if ( ! isset( $_POST['vintrica_notification_test_nonce'] ) ) {
+			return;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['vintrica_notification_test_nonce'] ) );
+
+		if ( ! wp_verify_nonce( $nonce, self::NOTIFICATION_TEST_NONCE ) ) {
+			add_settings_error( 'vintrica_settings', 'vintrica_notification_test_nonce', __( 'Overenie bezpečnosti zlyhalo.', 'vintrica-vignette-form' ), 'error' );
+			return;
+		}
+
+		$result = vintrica_vignette_form()->notifications->send_test_notification();
+
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'vintrica_settings', 'vintrica_notification_test_failed', $result->get_error_message(), 'error' );
+			return;
+		}
+
+		add_settings_error(
+			'vintrica_settings',
+			'vintrica_notification_test_ok',
+			sprintf(
+				/* translators: %s: recipient email address */
+				__( 'Testovací e-mail bol odoslaný na adresu %s.', 'vintrica-vignette-form' ),
+				esc_html( vintrica_vignette_form()->settings->get_notification_email() )
+			),
+			'updated'
+		);
 	}
 
 	/**
@@ -430,6 +476,7 @@ class Vintrica_Admin {
 	 * @return void
 	 */
 	private function render_order_detail( $order_id ) {
+		$order_id       = (int) $order_id;
 		$orders_handler = vintrica_vignette_form()->orders;
 		$pricing        = vintrica_vignette_form()->pricing;
 		$order          = $orders_handler->get_order( $order_id );
@@ -575,6 +622,9 @@ class Vintrica_Admin {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'Nastavenia VINTRICA', 'vintrica-vignette-form' ); ?></h1>
+			<div class="notice notice-info inline">
+				<p><?php echo esc_html__( 'Ak používate cache plugin (WP Super Cache, LiteSpeed, Cloudflare a pod.), vylúčte stránku s formulárom [vintrica_vignette_form] z cache. Inak môže zlyhať overenie bezpečnosti pri platbe.', 'vintrica-vignette-form' ); ?></p>
+			</div>
 			<form method="post">
 				<?php wp_nonce_field( self::SETTINGS_NONCE, 'vintrica_settings_nonce' ); ?>
 				<table class="form-table vintrica-admin-table" role="presentation">
@@ -614,6 +664,15 @@ class Vintrica_Admin {
 				</table>
 				<?php submit_button( __( 'Uložiť nastavenia', 'vintrica-vignette-form' ), 'primary', 'vintrica_settings_submit' ); ?>
 			</form>
+
+			<hr />
+
+			<h2><?php echo esc_html__( 'Diagnostika e-mailov', 'vintrica-vignette-form' ); ?></h2>
+			<p><?php echo esc_html__( 'Odošle testovací e-mail na nakonfigurovanú adresu pre notifikácie objednávok.', 'vintrica-vignette-form' ); ?></p>
+			<form method="post" class="vintrica-notification-test-form">
+				<?php wp_nonce_field( self::NOTIFICATION_TEST_NONCE, 'vintrica_notification_test_nonce' ); ?>
+				<?php submit_button( __( 'Odoslať testovací e-mail', 'vintrica-vignette-form' ), 'secondary', 'vintrica_notification_test_submit', false ); ?>
+			</form>
 		</div>
 		<?php
 	}
@@ -624,6 +683,10 @@ class Vintrica_Admin {
 	 * @return void
 	 */
 	public function render_catalog_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Nemáte oprávnenie na prístup k tejto stránke.', 'vintrica-vignette-form' ) );
+		}
+
 		if ( $this->catalog_admin ) {
 			$this->catalog_admin->render_page();
 		}
@@ -687,6 +750,10 @@ class Vintrica_Admin {
 							<td><code><?php echo esc_html( $diagnostics['key_prefix'] ); ?></code></td>
 						</tr>
 						<tr>
+							<th><?php echo esc_html__( 'Typ Webhook Secret', 'vintrica-vignette-form' ); ?></th>
+							<td><code><?php echo esc_html( $diagnostics['webhook_prefix'] ); ?></code></td>
+						</tr>
+						<tr>
 							<th><?php echo esc_html__( 'Základná success URL', 'vintrica-vignette-form' ); ?></th>
 							<td><a href="<?php echo esc_url( $diagnostics['success_redirect_base_url'] ); ?>"><?php echo esc_html( $diagnostics['success_redirect_base_url'] ); ?></a></td>
 						</tr>
@@ -714,7 +781,20 @@ class Vintrica_Admin {
 				<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><label for="vintrica-stripe-secret-key"><?php echo esc_html__( 'Secret Key', 'vintrica-vignette-form' ); ?></label></th>
-						<td><input type="password" class="regular-text" id="vintrica-stripe-secret-key" name="vintrica_stripe_secret_key" value="<?php echo esc_attr( $stripe->get_secret_key() ); ?>" autocomplete="off" /></td>
+						<td>
+							<input type="password" class="regular-text" id="vintrica-stripe-secret-key" name="vintrica_stripe_secret_key" value="" autocomplete="off" placeholder="<?php echo esc_attr( $stripe->get_masked_secret_key() ); ?>" />
+							<?php if ( '' !== trim( $stripe->get_secret_key() ) ) : ?>
+								<p class="description">
+									<?php
+									printf(
+										/* translators: %s: masked secret key prefix */
+										esc_html__( 'Aktuálne nastavený kľúč: %s. Nechajte pole prázdne pre zachovanie existujúceho kľúča.', 'vintrica-vignette-form' ),
+										esc_html( $stripe->get_masked_secret_key() )
+									);
+									?>
+								</p>
+							<?php endif; ?>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="vintrica-stripe-publishable-key"><?php echo esc_html__( 'Publishable Key', 'vintrica-vignette-form' ); ?></label></th>
@@ -723,8 +803,19 @@ class Vintrica_Admin {
 					<tr>
 						<th scope="row"><label for="vintrica-stripe-webhook-secret"><?php echo esc_html__( 'Stripe Webhook Secret', 'vintrica-vignette-form' ); ?></label></th>
 						<td>
-							<input type="password" class="regular-text" id="vintrica-stripe-webhook-secret" name="vintrica_stripe_webhook_secret" value="<?php echo esc_attr( $stripe->get_webhook_secret() ); ?>" autocomplete="off" />
+							<input type="password" class="regular-text" id="vintrica-stripe-webhook-secret" name="vintrica_stripe_webhook_secret" value="" autocomplete="off" placeholder="<?php echo esc_attr( $stripe->get_masked_webhook_secret() ); ?>" />
 							<p class="description"><?php echo esc_html__( 'Signing secret z webhooku checkout.session.completed vo vašom Stripe dashboarde.', 'vintrica-vignette-form' ); ?></p>
+							<?php if ( $stripe->get_webhook_secret_prefix() !== 'missing' ) : ?>
+								<p class="description">
+									<?php
+									printf(
+										/* translators: %s: masked webhook secret prefix */
+										esc_html__( 'Aktuálne nastavený secret: %s. Nechajte pole prázdne pre zachovanie existujúceho secretu.', 'vintrica-vignette-form' ),
+										esc_html( $stripe->get_masked_webhook_secret() )
+									);
+									?>
+								</p>
+							<?php endif; ?>
 						</td>
 					</tr>
 					<tr>

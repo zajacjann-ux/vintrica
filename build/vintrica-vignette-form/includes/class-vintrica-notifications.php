@@ -13,6 +13,21 @@ defined( 'ABSPATH' ) || exit;
 class Vintrica_Notifications {
 
 	/**
+	 * Notification context: new unpaid order.
+	 */
+	const CONTEXT_CREATED = 'created';
+
+	/**
+	 * Notification context: paid order.
+	 */
+	const CONTEXT_PAID = 'paid';
+
+	/**
+	 * Notification context: admin test email.
+	 */
+	const CONTEXT_TEST = 'test';
+
+	/**
 	 * Settings handler.
 	 *
 	 * @var Vintrica_Settings
@@ -45,7 +60,22 @@ class Vintrica_Notifications {
 		$this->orders   = $orders;
 		$this->pricing  = $pricing;
 
-		add_action( 'vintrica_order_paid', array( $this, 'send_admin_order_notification' ), 10, 2 );
+		add_action( 'vintrica_order_created', array( $this, 'send_admin_created_notification' ), 10, 1 );
+		add_action( 'vintrica_order_paid', array( $this, 'send_admin_paid_notification' ), 10, 2 );
+	}
+
+	/**
+	 * Send admin notification when a new unpaid order is created.
+	 *
+	 * @param object $order Order row.
+	 * @return bool
+	 */
+	public function send_admin_created_notification( $order ) {
+		if ( ! $order ) {
+			return false;
+		}
+
+		return $this->send_order_notification( $order, self::CONTEXT_CREATED );
 	}
 
 	/**
@@ -53,52 +83,170 @@ class Vintrica_Notifications {
 	 *
 	 * @param int    $order_id          Order ID.
 	 * @param string $payment_intent_id Stripe payment intent ID.
-	 * @return void
+	 * @return bool
 	 */
-	public function send_admin_order_notification( $order_id, $payment_intent_id = '' ) {
+	public function send_admin_paid_notification( $order_id, $payment_intent_id = '' ) {
 		unset( $payment_intent_id );
 
 		$order = $this->orders->get_order( (int) $order_id );
 
 		if ( ! $order ) {
-			return;
+			return false;
 		}
 
+		return $this->send_order_notification( $order, self::CONTEXT_PAID );
+	}
+
+	/**
+	 * Send a test notification email to the configured recipient.
+	 *
+	 * @return true|WP_Error
+	 */
+	public function send_test_notification() {
 		$recipient = $this->settings->get_notification_email();
 
 		if ( '' === $recipient || ! is_email( $recipient ) ) {
-			return;
+			return new WP_Error(
+				'vintrica_notification_test_invalid_email',
+				__( 'Nie je nastavená platná e-mailová adresa pre notifikácie.', 'vintrica-vignette-form' )
+			);
 		}
 
-		$subject = __( 'Nová objednávka VINTRICA', 'vintrica-vignette-form' );
-		$body    = $this->build_admin_order_email_body( $order );
-		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
+		$subject = __( 'VINTRICA – testovací e-mail notifikácií', 'vintrica-vignette-form' );
+		$body    = implode(
+			"\n",
+			array(
+				__( 'Toto je testovací e-mail z pluginu VINTRICA Vignette Form.', 'vintrica-vignette-form' ),
+				'',
+				__( 'Ak ste tento e-mail dostali, notifikačný kanál je správne nakonfigurovaný.', 'vintrica-vignette-form' ),
+				'',
+				__( 'Web:', 'vintrica-vignette-form' ) . ' ' . home_url( '/' ),
+				__( 'Príjemca:', 'vintrica-vignette-form' ) . ' ' . $recipient,
+				__( 'Odoslané:', 'vintrica-vignette-form' ) . ' ' . wp_date( 'd.m.Y H:i' ),
+			)
+		);
 
-		wp_mail( $recipient, $subject, $body, $headers );
+		if ( ! $this->dispatch_mail( $recipient, $subject, $body, 'test' ) ) {
+			return new WP_Error(
+				'vintrica_notification_test_failed',
+				__( 'Testovací e-mail sa nepodarilo odoslať. Skontrolujte nastavenie odosielania e-mailov na serveri.', 'vintrica-vignette-form' )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Send an order notification email.
+	 *
+	 * @param object $order   Order row.
+	 * @param string $context Notification context.
+	 * @return bool
+	 */
+	private function send_order_notification( $order, $context ) {
+		$recipient = $this->settings->get_notification_email();
+
+		if ( '' === $recipient || ! is_email( $recipient ) ) {
+			$this->log_mail_failure( $context, $order, 'missing_recipient' );
+			return false;
+		}
+
+		$subject = $this->get_subject_for_context( $context );
+		$body    = $this->build_admin_order_email_body( $order, $context );
+
+		return $this->dispatch_mail( $recipient, $subject, $body, $context, $order );
+	}
+
+	/**
+	 * Get email subject for a notification context.
+	 *
+	 * @param string $context Notification context.
+	 * @return string
+	 */
+	private function get_subject_for_context( $context ) {
+		if ( self::CONTEXT_PAID === $context ) {
+			return __( 'Nová objednávka VINTRICA – uhradená', 'vintrica-vignette-form' );
+		}
+
+		return __( 'Nová objednávka VINTRICA – čaká na platbu', 'vintrica-vignette-form' );
+	}
+
+	/**
+	 * Dispatch email via wp_mail with safe failure logging.
+	 *
+	 * @param string      $recipient Recipient email.
+	 * @param string      $subject   Email subject.
+	 * @param string      $body      Email body.
+	 * @param string      $context   Notification context.
+	 * @param object|null $order     Optional order row.
+	 * @return bool
+	 */
+	private function dispatch_mail( $recipient, $subject, $body, $context, $order = null ) {
+		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
+		$sent    = wp_mail( $recipient, $subject, $body, $headers );
+
+		if ( ! $sent ) {
+			$this->log_mail_failure( $context, $order, 'wp_mail_failed' );
+		}
+
+		return $sent;
+	}
+
+	/**
+	 * Log email delivery failures without exposing sensitive data.
+	 *
+	 * @param string      $context Failure context.
+	 * @param object|null $order   Optional order row.
+	 * @param string      $reason  Failure reason code.
+	 * @return void
+	 */
+	private function log_mail_failure( $context, $order, $reason ) {
+		$order_ref = ( $order && ! empty( $order->order_number ) )
+			? sanitize_text_field( (string) $order->order_number )
+			: 'n/a';
+
+		error_log(
+			sprintf(
+				'[VINTRICA] Admin notification failed (%1$s/%2$s) for order %3$s.',
+				sanitize_key( $context ),
+				sanitize_key( $reason ),
+				$order_ref
+			)
+		);
 	}
 
 	/**
 	 * Build plain-text admin notification body.
 	 *
-	 * @param object $order Order row.
+	 * @param object $order   Order row.
+	 * @param string $context Notification context.
 	 * @return string
 	 */
-	private function build_admin_order_email_body( $order ) {
-		$billing      = $this->orders->decode_billing( $order );
-		$vignettes    = $this->orders->decode_vignettes( $order );
-		$countries    = $this->pricing->get_countries();
-		$vehicles     = $this->pricing->get_vehicle_types();
-		$statuses     = $this->orders->get_statuses();
-		$status       = $this->orders->normalize_status( $order->status );
-		$status_label = $statuses[ $status ] ?? $status;
-		$detail_url   = admin_url( 'admin.php?page=' . Vintrica_Admin::ORDERS_SLUG . '&order_id=' . (int) $order->id );
-		$lines        = array(
-			__( 'Bola prijatá nová uhradená objednávka VINTRICA.', 'vintrica-vignette-form' ),
+	private function build_admin_order_email_body( $order, $context ) {
+		$billing    = $this->orders->decode_billing( $order );
+		$vignettes  = $this->orders->decode_vignettes( $order );
+		$countries  = $this->pricing->get_countries();
+		$vehicles   = $this->pricing->get_vehicle_types();
+		$statuses   = $this->orders->get_statuses();
+		$status     = $this->orders->normalize_status( $order->status );
+		$detail_url = admin_url( 'admin.php?page=' . Vintrica_Admin::ORDERS_SLUG . '&order_id=' . (int) $order->id );
+
+		if ( self::CONTEXT_PAID === $context ) {
+			$intro        = __( 'Bola prijatá nová uhradená objednávka VINTRICA.', 'vintrica-vignette-form' );
+			$status_label = $statuses[ $status ] ?? $status;
+		} else {
+			$intro        = __( 'Bola vytvorená nová objednávka VINTRICA, ktorá čaká na platbu.', 'vintrica-vignette-form' );
+			$status_label = __( 'Neuhradená / čaká na platbu', 'vintrica-vignette-form' );
+		}
+
+		$lines = array(
+			$intro,
 			'',
 			__( 'Číslo objednávky:', 'vintrica-vignette-form' ) . ' ' . $order->order_number,
 			__( 'Stav objednávky:', 'vintrica-vignette-form' ) . ' ' . $status_label,
 			'',
-			__( 'Meno zákazníka:', 'vintrica-vignette-form' ) . ' ' . $this->orders->get_customer_name( $order ),
+			__( 'Meno:', 'vintrica-vignette-form' ) . ' ' . ( $billing['first_name'] ?? '' ),
+			__( 'Priezvisko:', 'vintrica-vignette-form' ) . ' ' . ( $billing['last_name'] ?? '' ),
 			__( 'E-mail zákazníka:', 'vintrica-vignette-form' ) . ' ' . ( $billing['email'] ?? '' ),
 			__( 'Telefón:', 'vintrica-vignette-form' ) . ' ' . ( $billing['phone'] ?? '' ),
 			'',

@@ -3,7 +3,7 @@
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.5.3
+ * Version:           1.5.5
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            VINTRICA
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.5.3' );
+define( 'VINTRICA_VERSION', '1.5.5' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -107,6 +107,13 @@ final class Vintrica_Vignette_Form {
 	public $frontend;
 
 	/**
+	 * Notifications handler.
+	 *
+	 * @var Vintrica_Notifications
+	 */
+	public $notifications;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Vintrica_Vignette_Form
@@ -168,7 +175,7 @@ final class Vintrica_Vignette_Form {
 		$catalog_admin  = new Vintrica_Admin_Catalog( $this->catalog );
 		$this->admin    = new Vintrica_Admin( $catalog_admin );
 		$this->frontend = new Vintrica_Frontend( $this->security, $this->pricing, $this->checkout );
-		new Vintrica_Notifications( $this->settings, $this->orders, $this->pricing );
+		$this->notifications = new Vintrica_Notifications( $this->settings, $this->orders, $this->pricing );
 	}
 
 	/**

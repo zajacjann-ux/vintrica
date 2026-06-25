@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.5.3' );
+		define( 'VINTRICA_VERSION', '1.5.5' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -665,8 +665,10 @@ if ( ! isset( $GLOBALS['shortcode_tags']['vintrica_vignette_form'] ) ) {
 		vintrica_verify_fail( 'Shortcode output does not contain review step markup.' );
 	} elseif ( false === strpos( $shortcode_output, 'vintrica_billing_first_name' ) ) {
 		vintrica_verify_fail( 'Shortcode output does not contain billing form fields.' );
+	} elseif ( false === strpos( $shortcode_output, 'vintrica_hp_website' ) ) {
+		vintrica_verify_fail( 'Shortcode output does not contain honeypot field.' );
 	} else {
-		vintrica_verify_pass( 'Shortcode [vintrica_vignette_form] renders expected two-step checkout markup.' );
+		vintrica_verify_pass( 'Shortcode [vintrica_vignette_form] renders expected checkout markup with honeypot field.' );
 	}
 }
 
