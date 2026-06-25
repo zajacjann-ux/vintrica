@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.5.0' );
+		define( 'VINTRICA_VERSION', '1.5.2' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -555,6 +555,8 @@ $required_files = array(
 	'index.php',
 	'includes/index.php',
 	'includes/class-vintrica-catalog.php',
+	'includes/class-vintrica-settings.php',
+	'includes/class-vintrica-notifications.php',
 	'includes/class-vintrica-pricing.php',
 	'includes/class-vintrica-security.php',
 	'includes/class-vintrica-orders.php',

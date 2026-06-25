@@ -347,30 +347,36 @@ class Vintrica_Stripe {
 	 * @return true|WP_Error
 	 */
 	public function save_settings( array $settings ) {
-		$success_redirect_url = $this->sanitize_redirect_url_setting(
-			$settings['success_redirect_url'] ?? '',
-			__( 'URL ďakovnej stránky po úspešnej platbe', 'vintrica-vignette-form' )
-		);
-
-		if ( is_wp_error( $success_redirect_url ) ) {
-			return $success_redirect_url;
-		}
-
-		$cancel_redirect_url = $this->sanitize_redirect_url_setting(
-			$settings['cancel_redirect_url'] ?? '',
-			__( 'URL stránky po neúspešnej alebo zrušenej platbe', 'vintrica-vignette-form' )
-		);
-
-		if ( is_wp_error( $cancel_redirect_url ) ) {
-			return $cancel_redirect_url;
-		}
-
 		update_option( self::OPTION_SECRET_KEY, sanitize_text_field( $settings['secret_key'] ?? '' ) );
 		update_option( self::OPTION_PUBLISHABLE_KEY, sanitize_text_field( $settings['publishable_key'] ?? '' ) );
 		update_option( self::OPTION_WEBHOOK_SECRET, sanitize_text_field( $settings['webhook_secret'] ?? '' ) );
 		update_option( self::OPTION_TEST_MODE, ! empty( $settings['test_mode'] ) ? 1 : 0 );
-		update_option( self::OPTION_SUCCESS_REDIRECT_URL, $success_redirect_url );
-		update_option( self::OPTION_CANCEL_REDIRECT_URL, $cancel_redirect_url );
+
+		if ( array_key_exists( 'success_redirect_url', $settings ) ) {
+			$success_redirect_url = $this->sanitize_redirect_url_setting(
+				$settings['success_redirect_url'],
+				__( 'URL ďakovnej stránky po úspešnej platbe', 'vintrica-vignette-form' )
+			);
+
+			if ( is_wp_error( $success_redirect_url ) ) {
+				return $success_redirect_url;
+			}
+
+			update_option( self::OPTION_SUCCESS_REDIRECT_URL, $success_redirect_url );
+		}
+
+		if ( array_key_exists( 'cancel_redirect_url', $settings ) ) {
+			$cancel_redirect_url = $this->sanitize_redirect_url_setting(
+				$settings['cancel_redirect_url'],
+				__( 'URL stránky po neúspešnej alebo zrušenej platbe', 'vintrica-vignette-form' )
+			);
+
+			if ( is_wp_error( $cancel_redirect_url ) ) {
+				return $cancel_redirect_url;
+			}
+
+			update_option( self::OPTION_CANCEL_REDIRECT_URL, $cancel_redirect_url );
+		}
 
 		return true;
 	}

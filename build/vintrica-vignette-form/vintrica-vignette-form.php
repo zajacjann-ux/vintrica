@@ -3,7 +3,7 @@
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.5.0
+ * Version:           1.5.2
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            VINTRICA
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.5.0' );
+define( 'VINTRICA_VERSION', '1.5.2' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -42,6 +42,13 @@ final class Vintrica_Vignette_Form {
 	 * @var Vintrica_Catalog
 	 */
 	public $catalog;
+
+	/**
+	 * Settings handler.
+	 *
+	 * @var Vintrica_Settings
+	 */
+	public $settings;
 
 	/**
 	 * Pricing handler.
@@ -130,6 +137,8 @@ final class Vintrica_Vignette_Form {
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-activator.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-deactivator.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-catalog.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-settings.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-notifications.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-pricing.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-security.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-orders.php';
@@ -148,6 +157,7 @@ final class Vintrica_Vignette_Form {
 	 */
 	private function init_components() {
 		$this->catalog = new Vintrica_Catalog();
+		$this->settings = new Vintrica_Settings();
 		$this->pricing = new Vintrica_Pricing( $this->catalog );
 		$this->security = new Vintrica_Security( $this->pricing );
 		$this->orders   = new Vintrica_Orders();
@@ -158,6 +168,7 @@ final class Vintrica_Vignette_Form {
 		$catalog_admin  = new Vintrica_Admin_Catalog( $this->catalog );
 		$this->admin    = new Vintrica_Admin( $catalog_admin );
 		$this->frontend = new Vintrica_Frontend( $this->security, $this->pricing, $this->checkout );
+		new Vintrica_Notifications( $this->settings, $this->orders, $this->pricing );
 	}
 
 	/**

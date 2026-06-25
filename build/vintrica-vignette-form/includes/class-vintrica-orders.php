@@ -237,6 +237,16 @@ class Vintrica_Orders {
 	public function mark_as_paid( $order_id, $payment_intent_id = '' ) {
 		global $wpdb;
 
+		$order = $this->get_order( $order_id );
+
+		if ( ! $order ) {
+			return new WP_Error( 'vintrica_order_not_found', __( 'Objednávka nebola nájdená.', 'vintrica-vignette-form' ) );
+		}
+
+		if ( self::STATUS_PAID === $this->normalize_status( $order->status ) ) {
+			return true;
+		}
+
 		$data = array(
 			'status'  => self::STATUS_PAID,
 			'paid_at' => current_time( 'mysql', true ),
@@ -257,7 +267,19 @@ class Vintrica_Orders {
 			array( '%d' )
 		);
 
-		return false !== $updated;
+		if ( false === $updated ) {
+			return new WP_Error( 'vintrica_order_paid_failed', __( 'Objednávku sa nepodarilo označiť ako uhradenú.', 'vintrica-vignette-form' ) );
+		}
+
+		/**
+		 * Fires when an order is marked as paid for the first time.
+		 *
+		 * @param int    $order_id          Order ID.
+		 * @param string $payment_intent_id Stripe payment intent ID.
+		 */
+		do_action( 'vintrica_order_paid', (int) $order_id, $payment_intent_id );
+
+		return true;
 	}
 
 	/**

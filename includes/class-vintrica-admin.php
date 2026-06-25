@@ -33,6 +33,16 @@ class Vintrica_Admin {
 	const CATALOG_SLUG = 'vintrica-form-catalog';
 
 	/**
+	 * Settings submenu slug.
+	 */
+	const SETTINGS_SLUG = 'vintrica-form-settings';
+
+	/**
+	 * Nonce action for general settings.
+	 */
+	const SETTINGS_NONCE = 'vintrica_admin_settings';
+
+	/**
 	 * Admin catalog handler.
 	 *
 	 * @var Vintrica_Admin_Catalog|null
@@ -94,6 +104,15 @@ class Vintrica_Admin {
 
 		add_submenu_page(
 			self::MENU_SLUG,
+			__( 'Nastavenia', 'vintrica-vignette-form' ),
+			__( 'Nastavenia', 'vintrica-vignette-form' ),
+			'manage_options',
+			self::SETTINGS_SLUG,
+			array( $this, 'render_settings_page' )
+		);
+
+		add_submenu_page(
+			self::MENU_SLUG,
 			__( 'Cenník známok', 'vintrica-vignette-form' ),
 			__( 'Cenník známok', 'vintrica-vignette-form' ),
 			'manage_options',
@@ -140,6 +159,11 @@ class Vintrica_Admin {
 			return;
 		}
 
+		if ( isset( $_POST['vintrica_settings_submit'] ) ) {
+			$this->handle_settings_save();
+			return;
+		}
+
 		if ( isset( $_POST['vintrica_stripe_settings_submit'] ) ) {
 			$this->handle_stripe_settings_save();
 			return;
@@ -178,7 +202,6 @@ class Vintrica_Admin {
 				'publishable_key'       => isset( $_POST['vintrica_stripe_publishable_key'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_publishable_key'] ) ) : '',
 				'webhook_secret'        => isset( $_POST['vintrica_stripe_webhook_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['vintrica_stripe_webhook_secret'] ) ) : '',
 				'test_mode'             => ! empty( $_POST['vintrica_stripe_test_mode'] ),
-				'success_redirect_url'  => isset( $_POST['vintrica_stripe_success_redirect_url'] ) ? wp_unslash( $_POST['vintrica_stripe_success_redirect_url'] ) : '',
 				'cancel_redirect_url'   => isset( $_POST['vintrica_stripe_cancel_redirect_url'] ) ? wp_unslash( $_POST['vintrica_stripe_cancel_redirect_url'] ) : '',
 			)
 		);
@@ -195,6 +218,38 @@ class Vintrica_Admin {
 		if ( '' !== $key_warning ) {
 			add_settings_error( 'vintrica_stripe', 'vintrica_stripe_key_warning', $key_warning, 'warning' );
 		}
+	}
+
+	/**
+	 * Save general plugin settings.
+	 *
+	 * @return void
+	 */
+	private function handle_settings_save() {
+		if ( ! isset( $_POST['vintrica_settings_nonce'] ) ) {
+			return;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['vintrica_settings_nonce'] ) );
+
+		if ( ! wp_verify_nonce( $nonce, self::SETTINGS_NONCE ) ) {
+			add_settings_error( 'vintrica_settings', 'vintrica_settings_nonce', __( 'Overenie bezpečnosti zlyhalo.', 'vintrica-vignette-form' ), 'error' );
+			return;
+		}
+
+		$result = vintrica_vignette_form()->settings->save_settings(
+			array(
+				'notification_email'   => isset( $_POST['vintrica_notification_email'] ) ? wp_unslash( $_POST['vintrica_notification_email'] ) : '',
+				'success_redirect_url' => isset( $_POST['vintrica_success_redirect_url'] ) ? wp_unslash( $_POST['vintrica_success_redirect_url'] ) : '',
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'vintrica_settings', 'vintrica_settings_save_failed', $result->get_error_message(), 'error' );
+			return;
+		}
+
+		add_settings_error( 'vintrica_settings', 'vintrica_settings_saved', __( 'Nastavenia boli uložené.', 'vintrica-vignette-form' ), 'updated' );
 	}
 
 	/**
@@ -507,6 +562,65 @@ class Vintrica_Admin {
 	}
 
 	/**
+	 * Render general settings page.
+	 *
+	 * @return void
+	 */
+	public function render_settings_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Nemáte oprávnenie na prístup k tejto stránke.', 'vintrica-vignette-form' ) );
+		}
+
+		$settings = vintrica_vignette_form()->settings;
+
+		settings_errors( 'vintrica_settings' );
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html__( 'Nastavenia VINTRICA', 'vintrica-vignette-form' ); ?></h1>
+			<form method="post">
+				<?php wp_nonce_field( self::SETTINGS_NONCE, 'vintrica_settings_nonce' ); ?>
+				<table class="form-table vintrica-admin-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="vintrica-notification-email"><?php echo esc_html__( 'E-mail pre notifikácie objednávok', 'vintrica-vignette-form' ); ?></label></th>
+						<td>
+							<input type="email" class="regular-text" id="vintrica-notification-email" name="vintrica_notification_email" value="<?php echo esc_attr( $settings->get_configured_notification_email() ); ?>" autocomplete="email" />
+							<p class="description"><?php echo esc_html__( 'Na túto e-mailovú adresu budú chodiť notifikácie o prijatej objednávke.', 'vintrica-vignette-form' ); ?></p>
+							<p class="description">
+								<?php
+								printf(
+									/* translators: %s: fallback admin email */
+									esc_html__( 'Ak necháte prázdne, použije sa e-mail administrátora: %s', 'vintrica-vignette-form' ),
+									esc_html( sanitize_email( (string) get_option( 'admin_email' ) ) )
+								);
+								?>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="vintrica-success-redirect-url"><?php echo esc_html__( 'URL ďakovnej stránky po úspešnej platbe', 'vintrica-vignette-form' ); ?></label></th>
+						<td>
+							<input type="url" class="regular-text code" id="vintrica-success-redirect-url" name="vintrica_success_redirect_url" value="<?php echo esc_attr( $settings->get_configured_success_redirect_url() ); ?>" placeholder="<?php echo esc_attr( home_url( '/dakujeme/' ) ); ?>" />
+							<p class="description"><?php echo esc_html__( 'Sem vložte URL stránky, kam bude zákazník presmerovaný po úspešnej platbe.', 'vintrica-vignette-form' ); ?></p>
+							<p class="description">
+								<?php
+								printf(
+									/* translators: %s: default thank-you URL */
+									esc_html__( 'Ak necháte prázdne, použije sa predvolená adresa: %s', 'vintrica-vignette-form' ),
+									esc_url( home_url( '/dakujeme/' ) )
+								);
+								?>
+							</p>
+							<p class="description"><?php echo esc_html__( 'Po úspešnej platbe sa k adrese automaticky pripoja parametre vintrica_order_id a token.', 'vintrica-vignette-form' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button( __( 'Uložiť nastavenia', 'vintrica-vignette-form' ), 'primary', 'vintrica_settings_submit' ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Render catalog admin page.
 	 *
 	 * @return void
@@ -622,14 +736,6 @@ class Vintrica_Admin {
 								<input type="checkbox" name="vintrica_stripe_test_mode" value="1" <?php checked( $stripe->is_test_mode() ); ?> />
 								<?php echo esc_html__( 'Použiť testovacie Stripe kľúče', 'vintrica-vignette-form' ); ?>
 							</label>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="vintrica-stripe-success-redirect-url"><?php echo esc_html__( 'URL ďakovnej stránky po úspešnej platbe', 'vintrica-vignette-form' ); ?></label></th>
-						<td>
-							<input type="url" class="regular-text code" id="vintrica-stripe-success-redirect-url" name="vintrica_stripe_success_redirect_url" value="<?php echo esc_attr( $stripe->get_configured_success_redirect_url() ); ?>" placeholder="<?php echo esc_attr( home_url( '/dakujeme/' ) ); ?>" />
-							<p class="description"><?php echo esc_html__( 'Sem vložte URL stránky, kam bude zákazník presmerovaný po úspešnej platbe.', 'vintrica-vignette-form' ); ?></p>
-							<p class="description"><?php echo esc_html__( 'Ak necháte prázdne, použije sa predvolená adresa /dakujeme/.', 'vintrica-vignette-form' ); ?></p>
 						</td>
 					</tr>
 					<tr>
