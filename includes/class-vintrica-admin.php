@@ -532,8 +532,6 @@ class Vintrica_Admin {
 			<h2><?php echo esc_html__( 'Rozpis ceny', 'vintrica-vignette-form' ); ?></h2>
 			<table class="widefat striped vintrica-admin-table">
 				<tbody>
-					<tr><th><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->subtotal, 2 ) ); ?></td></tr>
-					<tr><th><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></th><td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->service_fee, 2 ) ); ?></td></tr>
 					<tr><th><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></th><td><strong><?php echo esc_html( $order->currency . ' ' . number_format_i18n( (float) $order->total, 2 ) ); ?></strong></td></tr>
 				</tbody>
 			</table>

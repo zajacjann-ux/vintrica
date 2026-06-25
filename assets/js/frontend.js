@@ -133,11 +133,9 @@
 		this.reviewVignettes = form.querySelector('.vintrica-review-vignettes');
 		this.reviewBilling = form.querySelector('.vintrica-review-billing');
 		this.reviewSubtotal = form.querySelector('.vintrica-review-subtotal');
-		this.reviewServiceFee = form.querySelector('.vintrica-review-service-fee');
 		this.reviewTotal = form.querySelector('.vintrica-review-total');
 		this.totalCount = form.querySelector('.vintrica-total-count');
 		this.totalSubtotal = form.querySelector('.vintrica-total-subtotal');
-		this.totalServiceFee = form.querySelector('.vintrica-total-service-fee');
 		this.totalAmount = form.querySelector('.vintrica-total-amount');
 
 		this.billingFields = {
@@ -955,8 +953,7 @@
 		return {
 			count: this.vignettes.length,
 			subtotal: subtotal,
-			serviceFee: this.vignettes.length > 0 ? config.serviceFee : 0,
-			total: subtotal + (this.vignettes.length > 0 ? config.serviceFee : 0)
+			total: subtotal
 		};
 	};
 
@@ -1059,7 +1056,6 @@
 		this.summaryEmpty.hidden = this.vignettes.length > 0;
 		this.totalCount.textContent = String(totals.count);
 		this.totalSubtotal.textContent = formatPrice(totals.subtotal);
-		this.totalServiceFee.textContent = formatPrice(totals.serviceFee);
 		this.totalAmount.textContent = formatPrice(totals.total);
 		this.continueButton.disabled = this.vignettes.length === 0;
 
@@ -1163,7 +1159,6 @@
 		}
 
 		this.reviewSubtotal.textContent = formatPrice(totals.subtotal);
-		this.reviewServiceFee.textContent = formatPrice(totals.serviceFee);
 		this.reviewTotal.textContent = formatPrice(totals.total);
 
 		billingCountry = getCountryLabel(this.billingFields.country.value);

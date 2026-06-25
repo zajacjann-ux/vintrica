@@ -165,7 +165,6 @@ class Vintrica_Frontend {
 			'emptySummary'              => __( 'Zatiaľ nebola pridaná žiadna známka.', 'vintrica-vignette-form' ),
 			'vignetteCount'             => __( 'Počet známok', 'vintrica-vignette-form' ),
 			'subtotal'                  => __( 'Medzisúčet', 'vintrica-vignette-form' ),
-			'serviceFee'                => __( 'Servisný poplatok', 'vintrica-vignette-form' ),
 			'total'                     => __( 'Celková suma', 'vintrica-vignette-form' ),
 			'validationRequired'        => __( 'Neplatné údaje.', 'vintrica-vignette-form' ),
 			'validationOrderEmpty'      => __( 'Pridajte aspoň jednu známku.', 'vintrica-vignette-form' ),
@@ -512,10 +511,6 @@ class Vintrica_Frontend {
 										<dt><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></dt>
 										<dd class="vintrica-total-subtotal"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
 									</div>
-									<div class="vintrica-summary-totals__row">
-										<dt><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></dt>
-										<dd class="vintrica-total-service-fee"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
-									</div>
 									<div class="vintrica-summary-totals__row vintrica-summary-totals__row--total">
 										<dt><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></dt>
 										<dd class="vintrica-total-amount"><?php echo esc_html( $this->format_price( 0 ) ); ?></dd>
@@ -655,10 +650,6 @@ class Vintrica_Frontend {
 								<div class="vintrica-summary-totals__row">
 									<dt><?php echo esc_html__( 'Medzisúčet', 'vintrica-vignette-form' ); ?></dt>
 									<dd class="vintrica-review-subtotal">0</dd>
-								</div>
-								<div class="vintrica-summary-totals__row">
-									<dt><?php echo esc_html__( 'Servisný poplatok', 'vintrica-vignette-form' ); ?></dt>
-									<dd class="vintrica-review-service-fee">0</dd>
 								</div>
 								<div class="vintrica-summary-totals__row vintrica-summary-totals__row--total">
 									<dt><?php echo esc_html__( 'Celková suma', 'vintrica-vignette-form' ); ?></dt>

@@ -43,20 +43,6 @@ class Vintrica_Pricing {
 	}
 
 	/**
-	 * Get flat service fee amount.
-	 *
-	 * @return float
-	 */
-	public function get_service_fee() {
-		/**
-		 * Filter the vignette order service fee.
-		 *
-		 * @param float $fee Service fee amount.
-		 */
-		return (float) apply_filters( 'vintrica_vignette_service_fee', 2.50 );
-	}
-
-	/**
 	 * Get active country labels from catalog.
 	 *
 	 * @return array<string, string>
@@ -225,8 +211,7 @@ class Vintrica_Pricing {
 	public function get_frontend_config() {
 		$config = $this->catalog->get_frontend_catalog();
 
-		$config['currency']   = $this->get_currency();
-		$config['serviceFee'] = $this->get_service_fee();
+		$config['currency'] = $this->get_currency();
 
 		/**
 		 * Filter frontend pricing configuration.
@@ -257,13 +242,13 @@ class Vintrica_Pricing {
 			}
 		}
 
-		$service_fee = count( $vignettes ) > 0 ? $this->get_service_fee() : 0.0;
+		$subtotal = round( $subtotal, 2 );
 
 		return array(
 			'count'       => count( $vignettes ),
-			'subtotal'    => round( $subtotal, 2 ),
-			'service_fee' => round( $service_fee, 2 ),
-			'total'       => round( $subtotal + $service_fee, 2 ),
+			'subtotal'    => $subtotal,
+			'service_fee' => 0.0,
+			'total'       => $subtotal,
 		);
 	}
 }
