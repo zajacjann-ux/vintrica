@@ -343,8 +343,9 @@ class Vintrica_Frontend {
 
 		$this->enqueue_assets( $storage_key );
 
-		$countries = $this->pricing->get_countries();
-		$notices   = $this->get_notices();
+		$vignette_countries      = $this->pricing->get_countries();
+		$registration_countries  = $this->pricing->get_registration_countries();
+		$notices                 = $this->get_notices();
 
 		ob_start();
 		?>
@@ -425,7 +426,7 @@ class Vintrica_Frontend {
 											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'globe' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 											<select id="vintrica-country" class="vintrica-choices-select" data-vintrica-field="country">
 												<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-												<?php foreach ( $countries as $value => $label ) : ?>
+												<?php foreach ( $vignette_countries as $value => $label ) : ?>
 													<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
 												<?php endforeach; ?>
 											</select>
@@ -475,7 +476,7 @@ class Vintrica_Frontend {
 											<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'registration' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 											<select id="vintrica-registration-country" class="vintrica-choices-select" data-vintrica-field="registration_country">
 												<option value=""><?php echo esc_html__( 'Vyberte krajinu registrácie vozidla', 'vintrica-vignette-form' ); ?></option>
-												<?php foreach ( $countries as $value => $label ) : ?>
+												<?php foreach ( $registration_countries as $value => $label ) : ?>
 													<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
 												<?php endforeach; ?>
 											</select>
@@ -599,7 +600,7 @@ class Vintrica_Frontend {
 										<span class="vintrica-control__icon" aria-hidden="true"><?php echo $this->render_field_icon( 'globe' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 										<select id="vintrica-billing-country" class="vintrica-choices-select" name="vintrica_billing_country" autocomplete="country" required>
 											<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-											<?php foreach ( $countries as $value => $label ) : ?>
+											<?php foreach ( $registration_countries as $value => $label ) : ?>
 												<option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></option>
 											<?php endforeach; ?>
 										</select>

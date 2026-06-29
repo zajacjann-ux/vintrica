@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.5.5' );
+		define( 'VINTRICA_VERSION', '1.6.0' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -716,6 +716,12 @@ if ( empty( $GLOBALS['wp_scripts']['localized']['vintrica-frontend']['vintricaCo
 	vintrica_verify_fail( 'Pricing config was not localized to JavaScript.' );
 } else {
 	vintrica_verify_pass( 'Pricing config localized to JavaScript via wp_localize_script.' );
+}
+
+if ( empty( $GLOBALS['wp_scripts']['localized']['vintrica-frontend']['vintricaConfig']['config']['registrationCountries'] ) ) {
+	vintrica_verify_fail( 'Registration countries were not localized to JavaScript.' );
+} else {
+	vintrica_verify_pass( 'Registration countries localized to JavaScript via wp_localize_script.' );
 }
 
 $frontend_js = file_get_contents( $plugin_root . '/assets/js/frontend.js' );

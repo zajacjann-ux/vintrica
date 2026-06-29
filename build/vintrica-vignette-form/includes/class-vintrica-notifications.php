@@ -223,10 +223,9 @@ class Vintrica_Notifications {
 	 * @return string
 	 */
 	private function build_admin_order_email_body( $order, $context ) {
-		$billing    = $this->orders->decode_billing( $order );
-		$vignettes  = $this->orders->decode_vignettes( $order );
-		$countries  = $this->pricing->get_countries();
-		$vehicles   = $this->pricing->get_vehicle_types();
+		$billing   = $this->orders->decode_billing( $order );
+		$vignettes = $this->orders->decode_vignettes( $order );
+		$vehicles  = $this->pricing->get_vehicle_types();
 		$statuses   = $this->orders->get_statuses();
 		$status     = $this->orders->normalize_status( $order->status );
 		$detail_url = admin_url( 'admin.php?page=' . Vintrica_Admin::ORDERS_SLUG . '&order_id=' . (int) $order->id );
@@ -265,11 +264,11 @@ class Vintrica_Notifications {
 				__( 'Známka %d', 'vintrica-vignette-form' ),
 				(int) $index + 1
 			);
-			$lines[] = '- ' . __( 'Krajina:', 'vintrica-vignette-form' ) . ' ' . ( $countries[ $country_code ] ?? $country_code );
+			$lines[] = '- ' . __( 'Krajina:', 'vintrica-vignette-form' ) . ' ' . $this->pricing->get_country_label( $country_code );
 			$lines[] = '- ' . __( 'Platnosť:', 'vintrica-vignette-form' ) . ' ' . $this->pricing->get_validity_label( $country_code, $validity_code, $vehicle_type );
 			$lines[] = '- ' . __( 'Typ vozidla:', 'vintrica-vignette-form' ) . ' ' . ( $vehicles[ $vehicle_type ] ?? $vehicle_type );
 			$lines[] = '- ' . __( 'ŠPZ:', 'vintrica-vignette-form' ) . ' ' . ( $vignette['license_plate'] ?? '' );
-			$lines[] = '- ' . __( 'Krajina registrácie:', 'vintrica-vignette-form' ) . ' ' . ( $countries[ $vignette['registration_country'] ?? '' ] ?? ( $vignette['registration_country'] ?? '' ) );
+			$lines[] = '- ' . __( 'Krajina registrácie:', 'vintrica-vignette-form' ) . ' ' . Vintrica_Country_Registry::resolve_label( $vignette['registration_country'] ?? '' );
 			$lines[] = '- ' . __( 'Dátum začiatku platnosti:', 'vintrica-vignette-form' ) . ' ' . ( $vignette['start_date'] ?? '' );
 			$lines[] = '- ' . __( 'Cena:', 'vintrica-vignette-form' ) . ' ' . $order->currency . ' ' . number_format_i18n( $price, 2 );
 			$lines[] = '';

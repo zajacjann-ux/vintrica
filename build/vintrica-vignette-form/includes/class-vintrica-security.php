@@ -284,8 +284,8 @@ class Vintrica_Security {
 					break;
 
 				case 'country':
-					$billing[ $field ] = sanitize_key( $value );
-					if ( ! isset( $this->pricing->get_countries()[ $billing[ $field ] ] ) ) {
+					$billing[ $field ] = Vintrica_Country_Registry::normalize_registration_value( $value );
+					if ( ! Vintrica_Country_Registry::is_valid_code( $billing[ $field ] ) ) {
 						return new WP_Error(
 							'vintrica_invalid_billing_country',
 							__( 'Neplatná fakturačná krajina.', 'vintrica-vignette-form' )
@@ -395,9 +395,11 @@ class Vintrica_Security {
 				return new WP_Error( 'vintrica_invalid_validity', __( 'Neplatná platnosť známky pre zvolenú krajinu a typ vozidla.', 'vintrica-vignette-form' ) );
 			}
 
-			if ( ! isset( $countries[ $vignette['registration_country'] ] ) ) {
+			if ( ! Vintrica_Country_Registry::is_valid_registration_value( $vignette['registration_country'] ) ) {
 				return new WP_Error( 'vintrica_invalid_registration', __( 'Neplatná krajina registrácie vozidla.', 'vintrica-vignette-form' ) );
 			}
+
+			$vignette['registration_country'] = Vintrica_Country_Registry::normalize_registration_value( $vignette['registration_country'] );
 
 			if ( empty( $vignette['start_date'] ) || empty( $vignette['license_plate'] ) ) {
 				return new WP_Error( 'vintrica_missing_fields', __( 'Každá známka musí obsahovať dátum začiatku platnosti a ŠPZ.', 'vintrica-vignette-form' ) );

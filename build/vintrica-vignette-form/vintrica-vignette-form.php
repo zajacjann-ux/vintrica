@@ -3,7 +3,7 @@
  * Plugin Name:       VINTRICA Vignette Form
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.5.5
+ * Version:           1.6.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            VINTRICA
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.5.5' );
+define( 'VINTRICA_VERSION', '1.6.0' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -144,6 +144,7 @@ final class Vintrica_Vignette_Form {
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-activator.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-deactivator.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-catalog.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-country-registry.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-settings.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-notifications.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-pricing.php';
@@ -209,6 +210,8 @@ final class Vintrica_Vignette_Form {
 			$this->catalog->create_tables();
 			$this->catalog->maybe_seed_defaults();
 		}
+
+		$this->catalog->sync_country_names_from_registry();
 	}
 
 	/**

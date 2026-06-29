@@ -568,7 +568,7 @@ class Vintrica_Admin {
 							<td><?php echo esc_html( $pricing->get_validity_label( $country_code, $validity_code, $vehicle_type ) ); ?></td>
 							<td><?php echo esc_html( $vehicles[ $vignette['vehicle_type'] ?? '' ] ?? ( $vignette['vehicle_type'] ?? '' ) ); ?></td>
 							<td><?php echo esc_html( $vignette['license_plate'] ?? '' ); ?></td>
-							<td><?php echo esc_html( $countries[ $vignette['registration_country'] ?? '' ] ?? ( $vignette['registration_country'] ?? '' ) ); ?></td>
+							<td><?php echo esc_html( Vintrica_Country_Registry::resolve_label( $vignette['registration_country'] ?? '' ) ); ?></td>
 							<td><?php echo esc_html( $vignette['start_date'] ?? '' ); ?></td>
 							<td><?php echo esc_html( $order->currency . ' ' . number_format_i18n( $price, 2 ) ); ?></td>
 						</tr>
@@ -875,7 +875,7 @@ class Vintrica_Admin {
 					( isset( $billing['zip'] ) ? trim( (string) $billing['zip'] ) : '' ) . ' ' .
 					( isset( $billing['city'] ) ? trim( (string) $billing['city'] ) : '' )
 				),
-				isset( $billing['country'] ) ? ( $countries[ $billing['country'] ] ?? (string) $billing['country'] ) : '',
+				isset( $billing['country'] ) ? Vintrica_Country_Registry::resolve_label( (string) $billing['country'] ) : '',
 			)
 		);
 

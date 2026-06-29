@@ -320,7 +320,7 @@ class Vintrica_Catalog {
 		$countries = $this->get_countries( true );
 
 		foreach ( $countries as $country ) {
-			$map[ $country->code ] = $country->name;
+			$map[ $country->code ] = Vintrica_Country_Registry::resolve_label( $country->code );
 		}
 
 		return $map;
@@ -359,18 +359,21 @@ class Vintrica_Catalog {
 		global $wpdb;
 
 		$country_id = isset( $data['id'] ) ? absint( $data['id'] ) : 0;
-		$name       = isset( $data['name'] ) ? sanitize_text_field( wp_unslash( $data['name'] ) ) : '';
 		$code       = isset( $data['code'] ) ? $this->normalize_country_code( $data['code'] ) : '';
 		$active     = ! empty( $data['active'] ) ? 1 : 0;
 		$sort_order = isset( $data['sort_order'] ) ? (int) $data['sort_order'] : 0;
 
-		if ( '' === $name ) {
-			return new WP_Error( 'vintrica_catalog_country_name', __( 'Zadajte názov krajiny.', 'vintrica-vignette-form' ) );
-		}
-
 		if ( '' === $code ) {
 			return new WP_Error( 'vintrica_catalog_country_code', __( 'Zadajte platný kód krajiny.', 'vintrica-vignette-form' ) );
 		}
+
+		$registry_country = Vintrica_Country_Registry::get_by_code( $code );
+
+		if ( null === $registry_country ) {
+			return new WP_Error( 'vintrica_catalog_country_code', __( 'Zadajte platný kód krajiny z registra.', 'vintrica-vignette-form' ) );
+		}
+
+		$name = Vintrica_Country_Registry::get_name( $code, 'sk' );
 
 		$existing = $this->get_country_by_code( $code );
 
@@ -408,6 +411,45 @@ class Vintrica_Catalog {
 		}
 
 		return $inserted;
+	}
+
+	/**
+	 * Ensure a catalog country row exists for a registry ISO code.
+	 *
+	 * @param string $code Registry ISO code.
+	 * @return int|WP_Error
+	 */
+	public function ensure_catalog_country( $code ) {
+		$code = $this->normalize_country_code( $code );
+
+		if ( '' === $code ) {
+			return new WP_Error( 'vintrica_catalog_country_code', __( 'Zadajte platný kód krajiny.', 'vintrica-vignette-form' ) );
+		}
+
+		if ( ! Vintrica_Country_Registry::is_valid_code( $code ) ) {
+			return new WP_Error( 'vintrica_catalog_country_code', __( 'Zadajte platný kód krajiny z registra.', 'vintrica-vignette-form' ) );
+		}
+
+		$existing = $this->get_country_by_code( $code );
+
+		if ( $existing ) {
+			return (int) $existing->id;
+		}
+
+		$inserted = $this->insert_country(
+			array(
+				'code'       => $code,
+				'name'       => Vintrica_Country_Registry::get_name( $code, 'sk' ),
+				'active'     => 0,
+				'sort_order' => 0,
+			)
+		);
+
+		if ( ! $inserted ) {
+			return new WP_Error( 'vintrica_catalog_country_insert', __( 'Krajinu sa nepodarilo pridať.', 'vintrica-vignette-form' ) );
+		}
+
+		return (int) $inserted;
 	}
 
 	/**
@@ -547,6 +589,7 @@ class Vintrica_Catalog {
 
 		$vignette_id    = isset( $data['id'] ) ? absint( $data['id'] ) : 0;
 		$country_id     = isset( $data['country_id'] ) ? absint( $data['country_id'] ) : 0;
+		$country_code   = isset( $data['country_code'] ) ? $this->normalize_country_code( $data['country_code'] ) : '';
 		$vehicle_type   = isset( $data['vehicle_type'] ) ? sanitize_key( $data['vehicle_type'] ) : '';
 		$vignette_code  = isset( $data['vignette_code'] ) ? sanitize_key( $data['vignette_code'] ) : '';
 		$name           = isset( $data['name'] ) ? sanitize_text_field( wp_unslash( $data['name'] ) ) : '';
@@ -554,6 +597,16 @@ class Vintrica_Catalog {
 		$price          = $this->sanitize_price( isset( $data['price'] ) ? $data['price'] : '' );
 		$active         = ! empty( $data['active'] ) ? 1 : 0;
 		$sort_order     = isset( $data['sort_order'] ) ? (int) $data['sort_order'] : 0;
+
+		if ( '' !== $country_code ) {
+			$ensured_country = $this->ensure_catalog_country( $country_code );
+
+			if ( is_wp_error( $ensured_country ) ) {
+				return $ensured_country;
+			}
+
+			$country_id = (int) $ensured_country;
+		}
 
 		if ( $country_id <= 0 || ! $this->get_country( $country_id ) ) {
 			return new WP_Error( 'vintrica_catalog_vignette_country', __( 'Vyberte platnú krajinu.', 'vintrica-vignette-form' ) );
@@ -737,7 +790,7 @@ class Vintrica_Catalog {
 		foreach ( $countries as $country ) {
 			$config['countries'][] = array(
 				'code'  => $country->code,
-				'label' => $country->name,
+				'label' => Vintrica_Country_Registry::resolve_label( $country->code ),
 			);
 
 			$config['validities'][ $country->code ]             = array();
@@ -769,6 +822,35 @@ class Vintrica_Catalog {
 		}
 
 		return $config;
+	}
+
+	/**
+	 * Sync stored catalog country names from the central registry.
+	 *
+	 * @return void
+	 */
+	public function sync_country_names_from_registry() {
+		global $wpdb;
+
+		foreach ( $this->get_countries() as $country ) {
+			$name = Vintrica_Country_Registry::get_name( $country->code, 'sk' );
+
+			if ( $name === $country->name ) {
+				continue;
+			}
+
+			if ( ! Vintrica_Country_Registry::is_valid_code( $country->code ) ) {
+				continue;
+			}
+
+			$wpdb->update(
+				$this->get_countries_table_name(),
+				array( 'name' => $name ),
+				array( 'id' => (int) $country->id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
 	}
 
 	/**

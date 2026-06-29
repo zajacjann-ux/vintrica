@@ -104,10 +104,20 @@ class Vintrica_Admin_Catalog {
 			wp_die( esc_html__( 'Nemáte oprávnenie na správu cenníka.', 'vintrica-vignette-form' ) );
 		}
 
-		$countries     = $this->catalog->get_countries();
-		$vehicle_types = $this->catalog->get_vehicle_types();
-		$edit_country  = isset( $_GET['edit_country'] ) ? $this->catalog->get_country( absint( $_GET['edit_country'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$edit_vignette = isset( $_GET['edit_vignette'] ) ? $this->catalog->get_vignette( absint( $_GET['edit_vignette'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$countries         = $this->catalog->get_countries();
+		$registry_countries = Vintrica_Country_Registry::get_all();
+		$vehicle_types     = $this->catalog->get_vehicle_types();
+		$edit_country      = isset( $_GET['edit_country'] ) ? $this->catalog->get_country( absint( $_GET['edit_country'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$edit_vignette     = isset( $_GET['edit_vignette'] ) ? $this->catalog->get_vignette( absint( $_GET['edit_vignette'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$selected_vignette_country_code = '';
+
+		if ( $edit_vignette ) {
+			$selected_catalog_country = $this->catalog->get_country( (int) $edit_vignette->country_id );
+
+			if ( $selected_catalog_country ) {
+				$selected_vignette_country_code = $selected_catalog_country->code;
+			}
+		}
 
 		settings_errors( 'vintrica_catalog' );
 		?>
@@ -128,7 +138,7 @@ class Vintrica_Admin_Catalog {
 						<table class="form-table vintrica-admin-table" role="presentation">
 							<tr>
 								<th scope="row"><label for="vintrica-country-name"><?php echo esc_html__( 'Názov krajiny', 'vintrica-vignette-form' ); ?></label></th>
-								<td><input name="name" id="vintrica-country-name" type="text" class="regular-text" value="<?php echo esc_attr( $edit_country ? $edit_country->name : '' ); ?>" required /></td>
+								<td><input name="name" id="vintrica-country-name" type="text" class="regular-text" value="<?php echo esc_attr( $edit_country ? Vintrica_Country_Registry::resolve_label( $edit_country->code ) : '' ); ?>" required /></td>
 							</tr>
 							<tr>
 								<th scope="row"><label for="vintrica-country-code"><?php echo esc_html__( 'Kód krajiny', 'vintrica-vignette-form' ); ?></label></th>
@@ -169,11 +179,12 @@ class Vintrica_Admin_Catalog {
 							<tr>
 								<th scope="row"><label for="vintrica-vignette-country"><?php echo esc_html__( 'Krajina', 'vintrica-vignette-form' ); ?></label></th>
 								<td>
-									<select name="country_id" id="vintrica-vignette-country" required>
+									<select name="country_code" id="vintrica-vignette-country" required>
 										<option value=""><?php echo esc_html__( 'Vyberte krajinu', 'vintrica-vignette-form' ); ?></option>
-										<?php foreach ( $countries as $country ) : ?>
-											<option value="<?php echo esc_attr( (string) $country->id ); ?>" <?php selected( $edit_vignette ? (int) $edit_vignette->country_id : 0, (int) $country->id ); ?>>
-												<?php echo esc_html( $country->name ); ?>
+										<?php foreach ( $registry_countries as $registry_country ) : ?>
+											<?php $registry_code = Vintrica_Country_Registry::normalize_code( $registry_country['code'] ); ?>
+											<option value="<?php echo esc_attr( $registry_code ); ?>" <?php selected( $selected_vignette_country_code, $registry_code ); ?>>
+												<?php echo esc_html( $registry_country['name_sk'] ); ?>
 											</option>
 										<?php endforeach; ?>
 									</select>
@@ -241,7 +252,7 @@ class Vintrica_Admin_Catalog {
 						<div class="vintrica-catalog-country">
 							<div class="vintrica-catalog-country__header">
 								<h3>
-									<?php echo esc_html( $country->name ); ?>
+									<?php echo esc_html( Vintrica_Country_Registry::resolve_label( $country->code ) ); ?>
 									<span class="description">(<?php echo esc_html( strtoupper( $country->code ) ); ?>)</span>
 									<?php if ( ! (int) $country->active ) : ?>
 										<span class="vintrica-status-badge vintrica-status-badge--cancelled"><?php echo esc_html__( 'Neaktívna', 'vintrica-vignette-form' ); ?></span>

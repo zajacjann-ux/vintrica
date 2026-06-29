@@ -31,6 +31,10 @@
 		return getLabelFromList(config.countries, code);
 	}
 
+	function getRegistrationCountryLabel(code) {
+		return getLabelFromList(config.registrationCountries || [], code);
+	}
+
 	function getVehicleLabel(code) {
 		return getLabelFromList(config.vehicleTypes, code);
 	}
@@ -1123,7 +1127,7 @@
 			body.appendChild(createReviewDetail(strings.labelVehicleType, getVehicleLabel(vignette.vehicle_type), 'vehicle'));
 			body.appendChild(createReviewDetail(strings.plateLabel, vignette.license_plate, 'plate'));
 			body.appendChild(createReviewDetail(strings.labelStartDate, vignette.start_date, 'calendar'));
-			body.appendChild(createReviewDetail(strings.labelRegistrationCountry, getCountryLabel(vignette.registration_country), 'globe'));
+			body.appendChild(createReviewDetail(strings.labelRegistrationCountry, getRegistrationCountryLabel(vignette.registration_country), 'globe'));
 
 			footer = document.createElement('footer');
 			footer.className = 'vintrica-review-vignette-card__footer';
@@ -1161,7 +1165,7 @@
 		this.reviewSubtotal.textContent = formatPrice(totals.subtotal);
 		this.reviewTotal.textContent = formatPrice(totals.total);
 
-		billingCountry = getCountryLabel(this.billingFields.country.value);
+		billingCountry = getRegistrationCountryLabel(this.billingFields.country.value);
 		addressParts = [
 			this.billingFields.street.value.trim(),
 			(this.billingFields.zip.value.trim() + ' ' + this.billingFields.city.value.trim()).trim(),

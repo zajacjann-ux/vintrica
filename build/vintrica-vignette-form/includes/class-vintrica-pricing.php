@@ -130,6 +130,15 @@ class Vintrica_Pricing {
 		return null !== $this->catalog->get_price( $country, $vehicle_type, $validity );
 	}
 
+	public function get_registration_countries() {
+		/**
+		 * Filter registration and billing country options.
+		 *
+		 * @param array<string, string> $countries Country code => Slovak label.
+		 */
+		return apply_filters( 'vintrica_registration_countries', Vintrica_Country_Registry::get_label_map() );
+	}
+
 	/**
 	 * Get localized country label by code.
 	 *
@@ -137,6 +146,16 @@ class Vintrica_Pricing {
 	 * @return string
 	 */
 	public function get_country_label( $code ) {
+		if ( Vintrica_Country_Registry::is_valid_code( $code ) ) {
+			return Vintrica_Country_Registry::resolve_label( $code );
+		}
+
+		$label = Vintrica_Country_Registry::resolve_label( $code );
+
+		if ( $label !== $code ) {
+			return $label;
+		}
+
 		$countries = $this->get_countries();
 
 		return isset( $countries[ $code ] ) ? $countries[ $code ] : $code;
@@ -205,7 +224,8 @@ class Vintrica_Pricing {
 	public function get_frontend_config() {
 		$config = $this->catalog->get_frontend_catalog();
 
-		$config['currency'] = $this->get_currency();
+		$config['currency']               = $this->get_currency();
+		$config['registrationCountries'] = Vintrica_Country_Registry::get_frontend_options();
 
 		/**
 		 * Filter frontend pricing configuration.
