@@ -89,8 +89,8 @@ class Vintrica_Admin {
 	 */
 	public function register_admin_menu() {
 		add_menu_page(
-			__( 'VINTRICA FORM', 'vintrica-vignette-form' ),
-			__( 'VINTRICA FORM', 'vintrica-vignette-form' ),
+			__( 'e-vignetta.eu', 'vintrica-vignette-form' ),
+			__( 'e-vignetta.eu', 'vintrica-vignette-form' ),
 			'manage_options',
 			self::MENU_SLUG,
 			array( $this, 'render_admin_page' ),
@@ -285,8 +285,10 @@ class Vintrica_Admin {
 
 		$result = vintrica_vignette_form()->settings->save_settings(
 			array(
-				'notification_email'   => isset( $_POST['vintrica_notification_email'] ) ? wp_unslash( $_POST['vintrica_notification_email'] ) : '',
-				'success_redirect_url' => isset( $_POST['vintrica_success_redirect_url'] ) ? wp_unslash( $_POST['vintrica_success_redirect_url'] ) : '',
+				'notification_email'      => isset( $_POST['vintrica_notification_email'] ) ? wp_unslash( $_POST['vintrica_notification_email'] ) : '',
+				'success_redirect_url'    => isset( $_POST['vintrica_success_redirect_url'] ) ? wp_unslash( $_POST['vintrica_success_redirect_url'] ) : '',
+				'customer_email_created'  => ! empty( $_POST['vintrica_customer_email_created'] ),
+				'customer_email_paid'     => ! empty( $_POST['vintrica_customer_email_paid'] ),
 			)
 		);
 
@@ -366,8 +368,8 @@ class Vintrica_Admin {
 
 		?>
 		<div class="wrap">
-			<h1><?php echo esc_html__( 'VINTRICA FORM', 'vintrica-vignette-form' ); ?></h1>
-			<p><?php echo esc_html__( 'Objednávkový formulár diaľničných známok so štvorkrokovým checkoutom a Stripe platbou.', 'vintrica-vignette-form' ); ?></p>
+			<h1><?php echo esc_html__( 'e-vignetta.eu', 'vintrica-vignette-form' ); ?></h1>
+			<p><?php echo esc_html__( 'e-vignetta.eu – Elektronické diaľničné známky. Objednávkový formulár so štvorkrokovým checkoutom a Stripe platbou.', 'vintrica-vignette-form' ); ?></p>
 			<p><code>[vintrica_vignette_form]</code></p>
 			<ol>
 				<li><?php echo esc_html__( 'Výber známok', 'vintrica-vignette-form' ); ?></li>
@@ -413,7 +415,7 @@ class Vintrica_Admin {
 
 		?>
 		<div class="wrap">
-			<h1><?php echo esc_html__( 'Objednávky VINTRICA', 'vintrica-vignette-form' ); ?></h1>
+			<h1><?php echo esc_html__( 'Objednávky e-vignetta.eu', 'vintrica-vignette-form' ); ?></h1>
 			<table class="widefat striped vintrica-admin-table">
 				<thead>
 					<tr>
@@ -621,7 +623,7 @@ class Vintrica_Admin {
 		settings_errors( 'vintrica_settings' );
 		?>
 		<div class="wrap">
-			<h1><?php echo esc_html__( 'Nastavenia VINTRICA', 'vintrica-vignette-form' ); ?></h1>
+			<h1><?php echo esc_html__( 'Nastavenia e-vignetta.eu', 'vintrica-vignette-form' ); ?></h1>
 			<div class="notice notice-info inline">
 				<p><?php echo esc_html__( 'Ak používate cache plugin (WP Super Cache, LiteSpeed, Cloudflare a pod.), vylúčte stránku s formulárom [vintrica_vignette_form] z cache. Inak môže zlyhať overenie bezpečnosti pri platbe.', 'vintrica-vignette-form' ); ?></p>
 			</div>
@@ -642,6 +644,19 @@ class Vintrica_Admin {
 								);
 								?>
 							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php echo esc_html__( 'E-maily zákazníkom', 'vintrica-vignette-form' ); ?></th>
+						<td>
+							<label style="display:block;margin-bottom:8px;">
+								<input type="checkbox" name="vintrica_customer_email_created" value="1" <?php checked( $settings->is_customer_email_on_created_enabled() ); ?> />
+								<?php echo esc_html__( 'Posielať zákazníkovi e-mail po vytvorení objednávky', 'vintrica-vignette-form' ); ?>
+							</label>
+							<label style="display:block;">
+								<input type="checkbox" name="vintrica_customer_email_paid" value="1" <?php checked( $settings->is_customer_email_on_paid_enabled() ); ?> />
+								<?php echo esc_html__( 'Posielať zákazníkovi e-mail po úspešnej platbe', 'vintrica-vignette-form' ); ?>
+							</label>
 						</td>
 					</tr>
 					<tr>
@@ -712,7 +727,7 @@ class Vintrica_Admin {
 			<h1><?php echo esc_html__( 'Nastavenia Stripe', 'vintrica-vignette-form' ); ?></h1>
 			<p><?php echo esc_html__( 'Zadajte Stripe API kľúče pre presmerovanie zákazníkov na Stripe Checkout po potvrdení objednávky.', 'vintrica-vignette-form' ); ?></p>
 			<p>
-				<strong><?php echo esc_html__( 'VINTRICA webhook URL:', 'vintrica-vignette-form' ); ?></strong><br />
+				<strong><?php echo esc_html__( 'e-vignetta.eu webhook URL:', 'vintrica-vignette-form' ); ?></strong><br />
 				<code><?php echo esc_html( $stripe->get_webhook_url() ); ?></code>
 			</p>
 			<div class="notice notice-info inline">

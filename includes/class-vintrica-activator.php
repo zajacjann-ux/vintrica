@@ -59,7 +59,7 @@ class Vintrica_Activator {
 				esc_html(
 					sprintf(
 						/* translators: %s: required PHP version */
-						__( 'Plugin VINTRICA Vignette Form vyžaduje PHP %s alebo novšie.', 'vintrica-vignette-form' ),
+						__( 'Plugin e-vignetta.eu – Elektronické diaľničné známky vyžaduje PHP %s alebo novšie.', 'vintrica-vignette-form' ),
 						self::MIN_PHP_VERSION
 					)
 				)
@@ -72,7 +72,7 @@ class Vintrica_Activator {
 				esc_html(
 					sprintf(
 						/* translators: %s: required WordPress version */
-						__( 'Plugin VINTRICA Vignette Form vyžaduje WordPress %s alebo novší.', 'vintrica-vignette-form' ),
+						__( 'Plugin e-vignetta.eu – Elektronické diaľničné známky vyžaduje WordPress %s alebo novší.', 'vintrica-vignette-form' ),
 						self::MIN_WP_VERSION
 					)
 				)

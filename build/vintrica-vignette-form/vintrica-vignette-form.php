@@ -1,12 +1,12 @@
 <?php
 /**
- * Plugin Name:       VINTRICA Vignette Form
+ * Plugin Name:       e-vignetta.eu – Elektronické diaľničné známky
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.6.0
+ * Version:           1.6.2
  * Requires at least: 6.0
  * Requires PHP:      7.4
- * Author:            VINTRICA
+ * Author:            e-vignetta.eu
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       vintrica-vignette-form
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.6.0' );
+define( 'VINTRICA_VERSION', '1.6.2' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -114,6 +114,13 @@ final class Vintrica_Vignette_Form {
 	public $notifications;
 
 	/**
+	 * Customer emails handler.
+	 *
+	 * @var Vintrica_Customer_Emails
+	 */
+	public $customer_emails;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Vintrica_Vignette_Form
@@ -147,6 +154,8 @@ final class Vintrica_Vignette_Form {
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-country-registry.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-settings.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-notifications.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-email-template.php';
+		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-customer-emails.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-pricing.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-security.php';
 		require_once VINTRICA_PLUGIN_DIR . 'includes/class-vintrica-orders.php';
@@ -177,6 +186,7 @@ final class Vintrica_Vignette_Form {
 		$this->admin    = new Vintrica_Admin( $catalog_admin );
 		$this->frontend = new Vintrica_Frontend( $this->security, $this->pricing, $this->checkout );
 		$this->notifications = new Vintrica_Notifications( $this->settings, $this->orders, $this->pricing );
+		$this->customer_emails = new Vintrica_Customer_Emails( $this->settings, $this->orders, $this->pricing );
 	}
 
 	/**

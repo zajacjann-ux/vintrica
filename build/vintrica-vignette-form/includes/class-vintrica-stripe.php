@@ -45,7 +45,7 @@ class Vintrica_Stripe {
 	/**
 	 * Stripe Checkout product name.
 	 */
-	const CHECKOUT_PRODUCT_NAME = 'Diaľničné známky VINTRICA';
+	const CHECKOUT_PRODUCT_NAME = 'Diaľničné známky e-vignetta.eu';
 
 	/**
 	 * Get Stripe secret key.

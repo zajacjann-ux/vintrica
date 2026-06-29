@@ -18,6 +18,16 @@ class Vintrica_Settings {
 	const OPTION_NOTIFICATION_EMAIL = 'vintrica_notification_email';
 
 	/**
+	 * Option key for customer email after order creation.
+	 */
+	const OPTION_CUSTOMER_EMAIL_CREATED = 'vintrica_customer_email_created';
+
+	/**
+	 * Option key for customer email after successful payment.
+	 */
+	const OPTION_CUSTOMER_EMAIL_PAID = 'vintrica_customer_email_paid';
+
+	/**
 	 * Get configured notification email (may be empty).
 	 *
 	 * @return string
@@ -39,6 +49,24 @@ class Vintrica_Settings {
 		}
 
 		return sanitize_email( (string) get_option( 'admin_email' ) );
+	}
+
+	/**
+	 * Check whether customer email after order creation is enabled.
+	 *
+	 * @return bool
+	 */
+	public function is_customer_email_on_created_enabled() {
+		return (bool) get_option( self::OPTION_CUSTOMER_EMAIL_CREATED, true );
+	}
+
+	/**
+	 * Check whether customer email after successful payment is enabled.
+	 *
+	 * @return bool
+	 */
+	public function is_customer_email_on_paid_enabled() {
+		return (bool) get_option( self::OPTION_CUSTOMER_EMAIL_PAID, true );
 	}
 
 	/**
@@ -86,6 +114,14 @@ class Vintrica_Settings {
 
 		update_option( self::OPTION_NOTIFICATION_EMAIL, $notification_email );
 		update_option( Vintrica_Stripe::OPTION_SUCCESS_REDIRECT_URL, $success_redirect_url );
+		update_option(
+			self::OPTION_CUSTOMER_EMAIL_CREATED,
+			! empty( $settings['customer_email_created'] ) ? 1 : 0
+		);
+		update_option(
+			self::OPTION_CUSTOMER_EMAIL_PAID,
+			! empty( $settings['customer_email_paid'] ) ? 1 : 0
+		);
 
 		return true;
 	}

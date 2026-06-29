@@ -112,11 +112,11 @@ class Vintrica_Notifications {
 			);
 		}
 
-		$subject = __( 'VINTRICA – testovací e-mail notifikácií', 'vintrica-vignette-form' );
+		$subject = __( 'e-vignetta.eu – testovací e-mail notifikácií', 'vintrica-vignette-form' );
 		$body    = implode(
 			"\n",
 			array(
-				__( 'Toto je testovací e-mail z pluginu VINTRICA Vignette Form.', 'vintrica-vignette-form' ),
+				__( 'Toto je testovací e-mail z e-vignetta.eu – Elektronické diaľničné známky.', 'vintrica-vignette-form' ),
 				'',
 				__( 'Ak ste tento e-mail dostali, notifikačný kanál je správne nakonfigurovaný.', 'vintrica-vignette-form' ),
 				'',
@@ -165,10 +165,10 @@ class Vintrica_Notifications {
 	 */
 	private function get_subject_for_context( $context ) {
 		if ( self::CONTEXT_PAID === $context ) {
-			return __( 'Nová objednávka VINTRICA – uhradená', 'vintrica-vignette-form' );
+			return __( 'Nová objednávka e-vignetta.eu – uhradená', 'vintrica-vignette-form' );
 		}
 
-		return __( 'Nová objednávka VINTRICA – čaká na platbu', 'vintrica-vignette-form' );
+		return __( 'Nová objednávka e-vignetta.eu – čaká na platbu', 'vintrica-vignette-form' );
 	}
 
 	/**
@@ -231,10 +231,10 @@ class Vintrica_Notifications {
 		$detail_url = admin_url( 'admin.php?page=' . Vintrica_Admin::ORDERS_SLUG . '&order_id=' . (int) $order->id );
 
 		if ( self::CONTEXT_PAID === $context ) {
-			$intro        = __( 'Bola prijatá nová uhradená objednávka VINTRICA.', 'vintrica-vignette-form' );
+			$intro        = __( 'Bola prijatá nová uhradená objednávka e-vignetta.eu.', 'vintrica-vignette-form' );
 			$status_label = $statuses[ $status ] ?? $status;
 		} else {
-			$intro        = __( 'Bola vytvorená nová objednávka VINTRICA, ktorá čaká na platbu.', 'vintrica-vignette-form' );
+			$intro        = __( 'Bola vytvorená nová objednávka e-vignetta.eu, ktorá čaká na platbu.', 'vintrica-vignette-form' );
 			$status_label = __( 'Neuhradená / čaká na platbu', 'vintrica-vignette-form' );
 		}
 
