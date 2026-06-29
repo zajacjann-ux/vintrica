@@ -1,0 +1,36 @@
+---
+description: VINTRICA plugin feature freeze — backward-compatible changes only
+alwaysApply: true
+---
+
+# VINTRICA Feature Freeze
+
+The plugin is **production-ready** and in **Feature Freeze** from v1.6.3 onward.
+
+## Allowed changes only
+
+- Bug fixes
+- Security fixes
+- UI improvements
+- Performance improvements
+- Compatibility fixes
+- Email improvements
+
+## Do not change without explicit approval
+
+- Architecture redesign or broad refactors of working code
+- Class, function, hook, or database renames
+- Database schema changes
+- Stripe flow, checkout flow, order flow, or webhook logic
+
+## Before modifying existing code
+
+1. Check whether the request can be implemented **without** changing stable logic.
+2. **Extend** existing code (filters, new methods, additive settings) instead of rewriting.
+3. Preserve backward compatibility: hooks, options, DB tables, REST payloads, and admin URLs must keep working.
+4. Update `CHANGELOG.md` for every release (including `[Unreleased]` during development).
+5. Bump `VINTRICA_VERSION` in `vintrica-vignette-form.php` and `bin/verify.php`, then run `bash bin/build.sh`.
+
+## Internal names stay stable
+
+Keep `vintrica_*` prefixes, `Vintrica_*` classes, and existing hook names even when user-facing text says **e-vignetta.eu**.

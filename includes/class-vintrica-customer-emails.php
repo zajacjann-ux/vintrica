@@ -268,7 +268,7 @@ class Vintrica_Customer_Emails {
 	private function build_vignettes_section_html( $order ) {
 		$vignettes = $this->orders->decode_vignettes( $order );
 		$vehicles  = $this->pricing->get_vehicle_types();
-		$html      = '<p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#0f172a;">' . esc_html__( 'Objednané známky', 'vintrica-vignette-form' ) . '</p>';
+		$html      = Vintrica_Email_Template::render_section_title( __( 'Objednané známky', 'vintrica-vignette-form' ) );
 
 		foreach ( $vignettes as $index => $vignette ) {
 			$country_code  = $vignette['country'] ?? '';

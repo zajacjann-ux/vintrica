@@ -113,16 +113,18 @@ class Vintrica_Notifications {
 		}
 
 		$subject = __( 'e-vignetta.eu – testovací e-mail notifikácií', 'vintrica-vignette-form' );
-		$body    = implode(
-			"\n",
-			array(
-				__( 'Toto je testovací e-mail z e-vignetta.eu – Elektronické diaľničné známky.', 'vintrica-vignette-form' ),
-				'',
-				__( 'Ak ste tento e-mail dostali, notifikačný kanál je správne nakonfigurovaný.', 'vintrica-vignette-form' ),
-				'',
-				__( 'Web:', 'vintrica-vignette-form' ) . ' ' . home_url( '/' ),
-				__( 'Príjemca:', 'vintrica-vignette-form' ) . ' ' . $recipient,
-				__( 'Odoslané:', 'vintrica-vignette-form' ) . ' ' . wp_date( 'd.m.Y H:i' ),
+		$body    = Vintrica_Email_Template::render_document(
+			__( 'Testovací e-mail notifikácií e-vignetta.eu.', 'vintrica-vignette-form' ),
+			Vintrica_Email_Template::render_heading( __( 'Testovací e-mail', 'vintrica-vignette-form' ) )
+			. Vintrica_Email_Template::render_paragraph( __( 'Toto je testovací e-mail z e-vignetta.eu – Elektronické diaľničné známky.', 'vintrica-vignette-form' ) )
+			. Vintrica_Email_Template::render_paragraph( __( 'Ak ste tento e-mail dostali, notifikačný kanál je správne nakonfigurovaný.', 'vintrica-vignette-form' ) )
+			. Vintrica_Email_Template::render_info_card(
+				__( 'Detaily testu', 'vintrica-vignette-form' ),
+				array(
+					__( 'Web', 'vintrica-vignette-form' )       => home_url( '/' ),
+					__( 'Príjemca', 'vintrica-vignette-form' )  => $recipient,
+					__( 'Odoslané', 'vintrica-vignette-form' )  => wp_date( 'd.m.Y H:i' ),
+				)
 			)
 		);
 
@@ -182,7 +184,7 @@ class Vintrica_Notifications {
 	 * @return bool
 	 */
 	private function dispatch_mail( $recipient, $subject, $body, $context, $order = null ) {
-		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
+		$headers = array( 'Content-Type: text/html; charset=UTF-8' );
 		$sent    = wp_mail( $recipient, $subject, $body, $headers );
 
 		if ( ! $sent ) {
@@ -216,41 +218,50 @@ class Vintrica_Notifications {
 	}
 
 	/**
-	 * Build plain-text admin notification body.
+	 * Build HTML admin notification body.
 	 *
 	 * @param object $order   Order row.
 	 * @param string $context Notification context.
 	 * @return string
 	 */
 	private function build_admin_order_email_body( $order, $context ) {
-		$billing   = $this->orders->decode_billing( $order );
-		$vignettes = $this->orders->decode_vignettes( $order );
-		$vehicles  = $this->pricing->get_vehicle_types();
+		$billing    = $this->orders->decode_billing( $order );
+		$vignettes  = $this->orders->decode_vignettes( $order );
+		$vehicles   = $this->pricing->get_vehicle_types();
 		$statuses   = $this->orders->get_statuses();
 		$status     = $this->orders->normalize_status( $order->status );
 		$detail_url = admin_url( 'admin.php?page=' . Vintrica_Admin::ORDERS_SLUG . '&order_id=' . (int) $order->id );
 
 		if ( self::CONTEXT_PAID === $context ) {
+			$heading      = __( 'Nová uhradená objednávka', 'vintrica-vignette-form' );
 			$intro        = __( 'Bola prijatá nová uhradená objednávka e-vignetta.eu.', 'vintrica-vignette-form' );
 			$status_label = $statuses[ $status ] ?? $status;
+			$preheader    = __( 'Nová uhradená objednávka e-vignetta.eu.', 'vintrica-vignette-form' );
 		} else {
+			$heading      = __( 'Nová objednávka čaká na platbu', 'vintrica-vignette-form' );
 			$intro        = __( 'Bola vytvorená nová objednávka e-vignetta.eu, ktorá čaká na platbu.', 'vintrica-vignette-form' );
 			$status_label = __( 'Neuhradená / čaká na platbu', 'vintrica-vignette-form' );
+			$preheader    = __( 'Nová objednávka e-vignetta.eu čaká na platbu.', 'vintrica-vignette-form' );
 		}
 
-		$lines = array(
-			$intro,
-			'',
-			__( 'Číslo objednávky:', 'vintrica-vignette-form' ) . ' ' . $order->order_number,
-			__( 'Stav objednávky:', 'vintrica-vignette-form' ) . ' ' . $status_label,
-			'',
-			__( 'Meno:', 'vintrica-vignette-form' ) . ' ' . ( $billing['first_name'] ?? '' ),
-			__( 'Priezvisko:', 'vintrica-vignette-form' ) . ' ' . ( $billing['last_name'] ?? '' ),
-			__( 'E-mail zákazníka:', 'vintrica-vignette-form' ) . ' ' . ( $billing['email'] ?? '' ),
-			__( 'Telefón:', 'vintrica-vignette-form' ) . ' ' . ( $billing['phone'] ?? '' ),
-			'',
-			__( 'Vybrané známky:', 'vintrica-vignette-form' ),
+		$content  = Vintrica_Email_Template::render_heading( $heading );
+		$content .= Vintrica_Email_Template::render_paragraph( $intro );
+		$content .= Vintrica_Email_Template::render_status_card(
+			__( 'Stav objednávky', 'vintrica-vignette-form' ),
+			$status_label
 		);
+		$content .= Vintrica_Email_Template::render_info_card(
+			__( 'Informácie o objednávke', 'vintrica-vignette-form' ),
+			array(
+				__( 'Číslo objednávky', 'vintrica-vignette-form' ) => (string) $order->order_number,
+				__( 'Meno', 'vintrica-vignette-form' )             => (string) ( $billing['first_name'] ?? '' ),
+				__( 'Priezvisko', 'vintrica-vignette-form' )       => (string) ( $billing['last_name'] ?? '' ),
+				__( 'E-mail zákazníka', 'vintrica-vignette-form' ) => (string) ( $billing['email'] ?? '' ),
+				__( 'Telefón', 'vintrica-vignette-form' )          => (string) ( $billing['phone'] ?? '' ),
+			)
+		);
+
+		$content .= Vintrica_Email_Template::render_section_title( __( 'Vybrané známky', 'vintrica-vignette-form' ) );
 
 		foreach ( $vignettes as $index => $vignette ) {
 			$country_code  = $vignette['country'] ?? '';
@@ -259,26 +270,35 @@ class Vintrica_Notifications {
 			$price         = $this->pricing->get_vignette_price( $country_code, $validity_code, $vehicle_type );
 			$price         = null !== $price ? $price : 0;
 
-			$lines[] = sprintf(
-				/* translators: %d: vignette index */
-				__( 'Známka %d', 'vintrica-vignette-form' ),
-				(int) $index + 1
+			$content .= Vintrica_Email_Template::render_vignette_card(
+				sprintf(
+					/* translators: %d: vignette index */
+					__( 'Známka %d', 'vintrica-vignette-form' ),
+					(int) $index + 1
+				),
+				array(
+					__( 'Krajina', 'vintrica-vignette-form' )             => $this->pricing->get_country_label( $country_code ),
+					__( 'Platnosť', 'vintrica-vignette-form' )            => $this->pricing->get_validity_label( $country_code, $validity_code, $vehicle_type ),
+					__( 'Typ vozidla', 'vintrica-vignette-form' )         => $vehicles[ $vehicle_type ] ?? $vehicle_type,
+					__( 'ŠPZ', 'vintrica-vignette-form' )                 => (string) ( $vignette['license_plate'] ?? '' ),
+					__( 'Krajina registrácie', 'vintrica-vignette-form' ) => Vintrica_Country_Registry::resolve_label( $vignette['registration_country'] ?? '' ),
+					__( 'Dátum začiatku platnosti', 'vintrica-vignette-form' ) => (string) ( $vignette['start_date'] ?? '' ),
+				),
+				Vintrica_Email_Template::format_money( (string) $order->currency, $price )
 			);
-			$lines[] = '- ' . __( 'Krajina:', 'vintrica-vignette-form' ) . ' ' . $this->pricing->get_country_label( $country_code );
-			$lines[] = '- ' . __( 'Platnosť:', 'vintrica-vignette-form' ) . ' ' . $this->pricing->get_validity_label( $country_code, $validity_code, $vehicle_type );
-			$lines[] = '- ' . __( 'Typ vozidla:', 'vintrica-vignette-form' ) . ' ' . ( $vehicles[ $vehicle_type ] ?? $vehicle_type );
-			$lines[] = '- ' . __( 'ŠPZ:', 'vintrica-vignette-form' ) . ' ' . ( $vignette['license_plate'] ?? '' );
-			$lines[] = '- ' . __( 'Krajina registrácie:', 'vintrica-vignette-form' ) . ' ' . Vintrica_Country_Registry::resolve_label( $vignette['registration_country'] ?? '' );
-			$lines[] = '- ' . __( 'Dátum začiatku platnosti:', 'vintrica-vignette-form' ) . ' ' . ( $vignette['start_date'] ?? '' );
-			$lines[] = '- ' . __( 'Cena:', 'vintrica-vignette-form' ) . ' ' . $order->currency . ' ' . number_format_i18n( $price, 2 );
-			$lines[] = '';
 		}
 
-		$lines[] = __( 'Celková suma:', 'vintrica-vignette-form' ) . ' ' . $order->currency . ' ' . number_format_i18n( (float) $order->total, 2 );
-		$lines[] = '';
-		$lines[] = __( 'Detail objednávky v administrácii:', 'vintrica-vignette-form' );
-		$lines[] = $detail_url;
+		$content .= Vintrica_Email_Template::render_totals_summary(
+			(string) $order->currency,
+			(float) $order->subtotal,
+			(float) $order->service_fee,
+			(float) $order->total
+		);
+		$content .= Vintrica_Email_Template::render_button(
+			$detail_url,
+			__( 'Detail objednávky v administrácii', 'vintrica-vignette-form' )
+		);
 
-		return implode( "\n", $lines );
+		return Vintrica_Email_Template::render_document( $preheader, $content );
 	}
 }

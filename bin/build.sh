@@ -23,6 +23,7 @@ mkdir -p "${BUILD_DIR}" "${DIST_DIR}"
 rsync -a \
 	--exclude '.git/' \
 	--exclude '.gitignore' \
+	--exclude '.cursor/' \
 	--exclude 'build/' \
 	--exclude 'dist/' \
 	--exclude 'bin/' \
@@ -40,4 +41,5 @@ rsync -a \
 )
 
 echo "Production ZIP created: ${ZIP_FILE}"
+echo "Remember: update CHANGELOG.md for every release."
 unzip -l "${ZIP_FILE}" | head -n 20

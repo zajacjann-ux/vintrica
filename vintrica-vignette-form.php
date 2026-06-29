@@ -3,7 +3,7 @@
  * Plugin Name:       e-vignetta.eu – Elektronické diaľničné známky
  * Plugin URI:        https://github.com/zajacjann-ux/vintrica
  * Description:       Objednávkový formulár diaľničných známok s vlastným checkoutom a prípravou Stripe platby.
- * Version:           1.6.2
+ * Version:           1.6.3
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            e-vignetta.eu
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VINTRICA_VERSION', '1.6.2' );
+define( 'VINTRICA_VERSION', '1.6.3' );
 define( 'VINTRICA_PLUGIN_VERSION', VINTRICA_VERSION );
 define( 'VINTRICA_PLUGIN_FILE', __FILE__ );
 define( 'VINTRICA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

@@ -52,7 +52,7 @@ function vintrica_bootstrap_wordpress_stubs() {
 	}
 
 	if ( ! defined( 'VINTRICA_VERSION' ) ) {
-		define( 'VINTRICA_VERSION', '1.6.2' );
+		define( 'VINTRICA_VERSION', '1.6.3' );
 	}
 
 	if ( ! defined( 'VINTRICA_PLUGIN_FILE' ) ) {
@@ -622,6 +622,15 @@ if ( ! defined( 'VINTRICA_VERSION' ) || '' === VINTRICA_VERSION ) {
 	vintrica_verify_fail( 'VINTRICA_VERSION constant is missing or empty.' );
 } else {
 	vintrica_verify_pass( 'VINTRICA_VERSION constant defined: ' . VINTRICA_VERSION );
+}
+
+$changelog_path = $plugin_root . '/CHANGELOG.md';
+if ( ! is_readable( $changelog_path ) ) {
+	vintrica_verify_fail( 'CHANGELOG.md is missing.' );
+} elseif ( false === strpos( (string) file_get_contents( $changelog_path ), '## [' . VINTRICA_VERSION . ']' ) ) {
+	vintrica_verify_fail( 'CHANGELOG.md has no section for version ' . VINTRICA_VERSION . '.' );
+} else {
+	vintrica_verify_pass( 'CHANGELOG.md documents version ' . VINTRICA_VERSION . '.' );
 }
 
 if ( ! function_exists( 'vintrica_vignette_form' ) ) {
